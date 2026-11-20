@@ -60,15 +60,3 @@ import SwiftData
     func uncheck() { self.isChecked = false }
 }
 
-enum LocationError: Error {
-    case permissionDenied
-    case unavailable
-
-    var message: String {
-        switch self {
-        case .permissionDenied: return "Location access is denied. Enable it in Settings to check this clue."
-        case .unavailable:      return "Your location is currently unavailable. Try again."
-        }
-    }
-}
-

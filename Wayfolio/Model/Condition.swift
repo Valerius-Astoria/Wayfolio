@@ -46,7 +46,7 @@ enum Condition: Codable {
 
     private func checkCoordinate(latitude: Double, longitude: Double, radius: Double) async -> String? {
         do {
-            let userLocation = try await getCurrentUserLocation()
+            let userLocation = try await LocationTracker.currentLocation()
             let target = CLLocation(latitude: latitude, longitude: longitude)
             let distance = userLocation.distance(from: target)   // meters
 
@@ -94,19 +94,5 @@ enum Condition: Codable {
         } catch {
             return "Image comparison failed: \(error.localizedDescription)"
         }
-    }
-
-    /// Requires iOS 18+ (`CLServiceSession`) and `NSLocationWhenInUseUsageDescription` in Info.plist.
-    private func getCurrentUserLocation() async throws -> CLLocation {
-        let session = CLServiceSession(authorization: .whenInUse)
-        defer { session.invalidate() }
-
-        for try await update in CLLocationUpdate.liveUpdates() {
-            if update.authorizationDenied || update.authorizationDeniedGlobally {
-                throw LocationError.permissionDenied
-            }
-            if let location = update.location { return location }
-        }
-        throw LocationError.unavailable
     }
 }

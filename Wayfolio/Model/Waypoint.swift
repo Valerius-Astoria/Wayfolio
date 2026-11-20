@@ -96,11 +96,28 @@ import SwiftData
     
     var isPOI: Bool { return poiIdentifier != nil }
     
-    /// - Returns the `MKMapItem` used to construct this waypoint, returns `nil` if it fails.
-    func getMKMapItem() async -> MKMapItem? {
+    /// - Returns: The MKMapItem corresponding to the place. 
+    func getMKMapItem() async -> MKMapItem? { await self.isPOI ? getPOIMKMapItem() : getCustomMKMapItem() }
+    
+    /// - Returns: the `MKMapItem` used to construct this waypoint, returns `nil` if it fails.
+    private func getPOIMKMapItem() async -> MKMapItem? {
         guard let raw = poiIdentifier, let identifier = MKMapItem.Identifier(rawValue: raw) else { return nil }
         let request = MKMapItemRequest(mapItemIdentifier: identifier)
         return try? await request.mapItem
+    }
+    
+    /// - Returns: the `MKMapItem` constructed from a custom place.
+    private func getCustomMKMapItem() -> MKMapItem {
+        let location = CLLocation(latitude: self.latitude, longitude: self.longitude)
+        var address = self.fullAddress.flatMap { full in
+            MKAddress(fullAddress: full, shortAddress: self.shortAddress)
+        }
+        
+        let item = MKMapItem(location: location, address: address)
+        item.phoneNumber = self.phoneNumber
+        item.url = self.url
+        
+        return item
     }
     
     /// `radius` is in meters.
