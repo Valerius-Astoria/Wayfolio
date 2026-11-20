@@ -23,9 +23,11 @@ import SwiftData
     var schedule: Schedule
     var isChecked: Bool
     var condition: Condition = Condition.noCondition
+    var order: Int
     
     @Relationship(deleteRule: .cascade, inverse: \Clue.waypoint)
-    var clues: [Clue]
+    var clues: [Clue] = []
+    var adventure: Adventure
     
     /// Initializer for a POI item.
     ///
@@ -37,10 +39,11 @@ import SwiftData
     /// - Parameter isChecked: Whether the placed has been checked by user, default to `false`.
     init(item: MKMapItem,
          intro: String?,
-         clues: [Clue] = [],
          hours: Hours? = nil,
          schedule: Schedule,
-         isChecked: Bool = false) {
+         isChecked: Bool = false,
+         order: Int,
+         adventure: Adventure) {
         self.name = item.name ?? "Unknown Place"
         self.latitude = item.location.coordinate.latitude
         self.longitude = item.location.coordinate.longitude
@@ -51,10 +54,11 @@ import SwiftData
         self.url = item.url
         self.icon = "mappin"
         self.intro = intro
-        self.clues = clues
         self.hours = hours
         self.schedule = schedule
         self.isChecked = isChecked
+        self.order = order
+        self.adventure = adventure
     }
     
     /// Initializer for a custom place.
@@ -78,7 +82,9 @@ import SwiftData
          hours: Hours? = nil,
          schedule: Schedule,
          isChecked: Bool,
-         clues: [Clue] = []) {
+         clues: [Clue] = [],
+         order: Int,
+         adventure: Adventure) {
         self.name = name
         self.latitude = latitude
         self.longitude = longitude
@@ -92,6 +98,8 @@ import SwiftData
         self.schedule = schedule
         self.isChecked = isChecked
         self.clues = clues
+        self.order = order
+        self.adventure = adventure
     }
     
     var isPOI: Bool { return poiIdentifier != nil }
@@ -140,6 +148,10 @@ import SwiftData
     /// - Returns: An optional boolean that shows whether the place is currently open, returns `nil` if the information is insufficient to determine.
     func isOpening() -> Bool? {
         hours?.isOpen()
+    }
+    
+    func addClue(clue: Clue) {
+        clues.append(clue)
     }
 }
 

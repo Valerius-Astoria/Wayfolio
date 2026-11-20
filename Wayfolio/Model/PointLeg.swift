@@ -14,12 +14,21 @@ import SwiftData
     var transportType: TransportType
     var customCoordinates: [RouteCoordinate] = []
     var estimatedMinutes: Int = 0 // The estimated minute for custom route
+    var order: Int
+    
+    var adventure: Adventure
     
     /// - Parameters estimatedMinutes: The estimated minutes
-    init(startingPoint: Waypoint, endPoint: Waypoint, transportType: TransportType) {
+    init(startingPoint: Waypoint,
+         endPoint: Waypoint,
+         transportType: TransportType,
+         order: Int,
+         adventure: Adventure) {
         self.startingPoint = startingPoint
         self.endPoint = endPoint
         self.transportType = transportType
+        self.order = order
+        self.adventure = adventure
     }
     
     var useCustomRoute: Bool { !customCoordinates .isEmpty }

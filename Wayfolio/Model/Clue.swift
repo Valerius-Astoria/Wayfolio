@@ -16,10 +16,18 @@ import SwiftData
     var icon: String
     var isChecked: Bool
     var condition: Condition
+    var order: Int
 
     var waypoint: Waypoint
 
-    init(name: String, brief: String, detail: String? = nil, icon: String = "folder", isChecked: Bool = false, waypoint: Waypoint, condition: Condition = .noCondition) {
+    init(name: String,
+         brief: String,
+         detail: String? = nil,
+         icon: String = "folder",
+         isChecked: Bool = false,
+         waypoint: Waypoint,
+         condition: Condition = .noCondition,
+         order: Int) {
         self.name = name
         self.brief = brief
         self.detail = detail
@@ -27,6 +35,7 @@ import SwiftData
         self.isChecked = isChecked
         self.waypoint = waypoint
         self.condition = condition
+        self.order = order
     }
 
     // MARK: - Setting conditions
