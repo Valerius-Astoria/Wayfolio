@@ -25,6 +25,7 @@ import CoreLocation
         self.name = name
         self.brief = brief
         self.intro = intro
+        self.notes = notes
     }
     
     /// Calculated using the highest `day` value from `waypoints`.
@@ -35,6 +36,11 @@ import CoreLocation
     /// An adventure is completed only when all waypoints are checked.
     var isChecked: Bool {
         waypoints.allSatisfy { $0.isChecked }
+    }
+    
+    /// - Returns: Days that have waypoints to visit. 
+    var days: [Int] {
+        Set(waypoints.map(\.schedule.day)).sorted()
     }
     
     /// Track user location during adventure
@@ -50,13 +56,39 @@ import CoreLocation
             trace.append(RouteCoordinate(location.coordinate))
         }
     }
+    
+    /// - Returns: An array of waypoints on `day` in order.
+    func waypoints(on day: Int) -> [Waypoint] {
+        waypoints
+            .filter { $0.schedule.day == day }
+            .sorted { $0.order < $1.order }
+    }
+    
+    /// The leg that departs from `waypoint`, if any.
+    func leg(from waypoint: Waypoint) -> PointLeg? {
+        pointLegs.first { $0.startingPoint == waypoint }
+    }
+    
+    // MARK: - Sample Data
+    static let sampleData: [Adventure] = [
+        Adventure(
+            name: "MyAdventure",
+            brief: "An adventure we all like, an adventure we all admire.",
+            intro: "This is a really cool adventure that brings you back to the laet centry. During this adventure, you'll visit the village tha t only exists in your imagination, rivers as clear as crystle, and status so vivid that you doubt if they are real.",
+            notes: [
+                Note(icon: "bus", body: "Remember to take buses as you can, taxies are expensive"),
+                Note(icon: "umbrella", body: "Always bring an unbrella with you, it rains a lot")
+            ])
+    ]
 }
 
-struct Note: Codable {
+struct Note: Codable, Identifiable {
+    var id: UUID = UUID()
+    
     var icon: String
-    var bofy: String
+    var body: String
 }
 
-enum Status: Codable {
+enum Status: String, Codable {
     case notStarted, stared, ended, abondened
 }
