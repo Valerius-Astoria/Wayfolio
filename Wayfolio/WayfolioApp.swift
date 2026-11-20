@@ -11,7 +11,7 @@ import SwiftUI
 struct WayfolioApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ImageComparer()
         }
     }
 }
