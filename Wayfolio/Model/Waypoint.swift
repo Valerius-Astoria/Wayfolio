@@ -9,12 +9,20 @@ import MapKit
 import SwiftData
 
 @Model class Waypoint {
-    var item: MKMapItem
+    var name: String
+    var latitude: Double
+    var longitude: Double
+    var poiIdentifier: String?
+    var phoneNumber: String?
+    var fullAddress: String?
+    var shortAddress: String?
+    var url: URL?
     var icon: String
     var intro: String?
     var hours: Hours?
     var schedule: Schedule
     var isChecked: Bool
+    var condition: Condition = Condition.noCondition
     
     @Relationship(deleteRule: .cascade, inverse: \Clue.waypoint)
     var clues: [Clue]
@@ -33,7 +41,15 @@ import SwiftData
          hours: Hours? = nil,
          schedule: Schedule,
          isChecked: Bool = false) {
-        self.item = item
+        self.name = item.name ?? "Unknown Place"
+        self.latitude = item.location.coordinate.latitude
+        self.longitude = item.location.coordinate.longitude
+        self.poiIdentifier = item.identifier?.rawValue
+        self.phoneNumber = item.phoneNumber
+        self.fullAddress = item.address?.fullAddress
+        self.shortAddress = item.address?.shortAddress
+        self.url = item.url
+        self.icon = "mappin"
         self.intro = intro
         self.clues = clues
         self.hours = hours
@@ -50,29 +66,57 @@ import SwiftData
     /// - Parameter clues: Clues hidden in the place.
     /// - Parameter hours: Opening hours of the place
     /// - Parameter isChecked: Whether the placed has been checked by user, default to `false`.
-    init(latitude: Double,
+    init(name: String,
+         latitude: Double,
          longitude: Double,
-         name: String,
-         phoneNumber: String?,
-         fullAddress: String?,
-         shortAddress: String?,
-         url: URL?,
+         phoneNumber: String? = nil,
+         fullAddress: String? = nil,
+         shortAddress: String? = nil,
+         url: URL? = nil,
          icon: String = "mappin",
-         intro: String?,
-         clues: [Clue] = [],
+         intro: String? = nil,
          hours: Hours? = nil,
-         isChecked: Bool = false) {
-        item = MKMapItem(location: CLLocation(latitude: latitude, longitude: longitude), address: MKAddress(fullAddress: fullAddress ?? "", shortAddress: shortAddress))
-        item.phoneNumber = phoneNumber
-        item.url = url
+         schedule: Schedule,
+         isChecked: Bool,
+         clues: [Clue] = []) {
+        self.name = name
+        self.latitude = latitude
+        self.longitude = longitude
+        self.phoneNumber = phoneNumber
+        self.fullAddress = fullAddress
+        self.shortAddress = shortAddress
+        self.url = url
+        self.icon = icon
         self.intro = intro
-        self.clues = clues
         self.hours = hours
+        self.schedule = schedule
         self.isChecked = isChecked
+        self.clues = clues
     }
     
-    /// Marks the place as checked.
-    func check() { self.isChecked = true }
+    var isPOI: Bool { return poiIdentifier != nil }
+    
+    /// - Returns the `MKMapItem` used to construct this waypoint, returns `nil` if it fails.
+    func getMKMapItem() async -> MKMapItem? {
+        guard let raw = poiIdentifier, let identifier = MKMapItem.Identifier(rawValue: raw) else { return nil }
+        let request = MKMapItemRequest(mapItemIdentifier: identifier)
+        return try? await request.mapItem
+    }
+    
+    /// `radius` is in meters.
+    func addCoordinateCondition(latitude: Double, longitude: Double, radius: Double) {
+        self.condition = .coordinate(latitude: latitude, longitude: longitude, radius: radius)
+    }
+    
+    /// - Returns: `nil` if check is perfomed successfully (regardless of the checking result), returns the reason of error when it fails. 
+    func check() async -> String? {
+        if let errorMessage = await condition.check() {
+            return errorMessage
+        } else {
+            isChecked = true
+            return nil
+        }
+    }
     
     /// Checks if the place is currently open.
     ///
@@ -80,29 +124,6 @@ import SwiftData
     func isOpening() -> Bool? {
         hours?.isOpen()
     }
-}
-
-/// Stores a clue hidden in one place.
-@Model class Clue {
-    var name: String
-    var brief: String
-    var detail: String
-    var icon: String
-    var isChecked: Bool
-    
-    var waypoint: Waypoint
-    
-    init(name: String, brief: String, detail: String = "", icon: String = "folder", isChecked: Bool = false, waypoint: Waypoint) {
-        self.name = name
-        self.brief = brief
-        self.detail = detail
-        self.icon = icon
-        self.isChecked = isChecked
-        self.waypoint = waypoint
-    }
-    
-    /// Marks the clue as checked.
-    func check() { self.isChecked = true }
 }
 
 /// Stores a place's bussiness hours.
@@ -157,4 +178,9 @@ struct Schedule: Codable {
         self.start = DateComponents(hour: startHour, minute: startMinute)
         self.end = DateComponents(hour: endHour, minute: endMinute)
     }
+}
+
+enum WaypointCondition {
+    case noCondition
+    case coordinate(latitude: Double, longitude: Double, radius: Double)
 }
