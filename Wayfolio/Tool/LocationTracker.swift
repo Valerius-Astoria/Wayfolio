@@ -7,18 +7,18 @@
 
 import CoreLocation
 
+/// Provides the user's location as async sequences, built on `CLLocationUpdate.liveUpdates()`.
 struct LocationTracker {
     /// Streams filtered location updates until the consuming task is cancelled or the stream is no longer iterated.
     ///
+    /// Requires iOS 18+ (`CLServiceSession`) and `NSLocationWhenInUseUsageDescription` in Info.plist.
+    /// Start it while the app is in the foreground.
     /// - Parameters:
     ///   - maxAccuracy: Fixes with a worse horizontal accuracy (in meters) are dropped.
     ///   - minimumDistance: A fix closer than this (in meters) to the last delivered one is dropped. Use `0` to deliver everything.
     ///   - inBackground: Keeps updates flowing while the app is backgrounded
     ///     (needs the "Location updates" background mode).
-    /// - Throws: `LocationError.permissionDenied` if the user denies access.
-    ///
-    /// Requires iOS 18+ (`CLServiceSession`) and `NSLocationWhenInUseUsageDescription` in Info.plist.
-    /// Call it while the app is in the foreground.
+    /// - Returns: A stream of locations. It finishes with `LocationError.permissionDenied` if the user denies access.
     static func updates(
         maxAccuracy: CLLocationAccuracy = 50,
         minimumDistance: CLLocationDistance = 5,
@@ -64,8 +64,10 @@ struct LocationTracker {
         }
     }
 
-    /// Returns the first acceptable location fix.
-    /// - Throws: `LocationError.permissionDenied` or `LocationError.unavailable`.
+    /// Returns the first location fix that is at least as accurate as `maxAccuracy` (in meters).
+    ///
+    /// - Throws: `LocationError.permissionDenied` if the user denies access,
+    ///   or `LocationError.unavailable` if updates end without an acceptable fix.
     static func currentLocation(maxAccuracy: CLLocationAccuracy = 100) async throws -> CLLocation {
         for try await location in updates(maxAccuracy: maxAccuracy, minimumDistance: 0, inBackground: false) {
             return location   // leaving the loop terminates the stream and stops tracking
@@ -75,10 +77,12 @@ struct LocationTracker {
 }
 
 
+/// Errors thrown by `LocationTracker`.
 enum LocationError: LocalizedError {
     case permissionDenied
     case unavailable
 
+    /// A user-facing explanation of the error.
     var message: String {
         switch self {
         case .permissionDenied: return "Location access is denied. Enable it in Settings."

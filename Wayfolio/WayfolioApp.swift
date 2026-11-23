@@ -6,12 +6,17 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct WayfolioApp: App {
     var body: some Scene {
         WindowGroup {
-//            ImageComparer()
+//            SearchSheet()
+//                .modelContainer(SampleData.shared.modelContainer)
+            NavigationStack {
+                AdventureDetail(adventure: Adventure.createSampleAdventure())
+            }
         }
     }
 }

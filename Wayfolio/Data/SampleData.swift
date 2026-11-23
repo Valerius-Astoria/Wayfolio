@@ -9,6 +9,7 @@ import Foundation
 import SwiftData
 
 
+/// An in-memory SwiftData store filled with sample adventures, for previews and development.
 @MainActor
 class SampleData {
     static let shared = SampleData()
@@ -17,6 +18,7 @@ class SampleData {
     let modelContainer: ModelContainer
 
 
+    /// The container's main context.
     var context: ModelContext {
         modelContainer.mainContext
     }

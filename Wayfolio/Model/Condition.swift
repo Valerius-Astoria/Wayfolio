@@ -10,19 +10,26 @@ import SwiftUI
 import Vision
 import MapKit
 
+/// A requirement the user must meet to check a waypoint or clue.
 enum Condition: Codable {
+    /// Always met.
     case noCondition
+    /// Met when the user is within `radius` meters of the coordinate.
     case coordinate(latitude: Double, longitude: Double, radius: Double)
+    /// Met when the user's photo looks similar to this reference image (JPEG data).
     case image(Data)
+    /// Met when the user types this answer. Case and surrounding whitespace are ignored.
     case answer(String)
-    
+
     // MARK: - Checking
 
-    /// Checks whether the condition is met. Marks the clue as checked on success.
+    /// Checks whether the condition is met.
+    ///
+    /// This doesn't change any state. The caller is responsible for marking its waypoint or clue as checked.
     /// - Parameters:
-    ///   - attempt: The typed answer (for `.answer` conditions).
-    ///   - image: The photo taken by the user (for `.image` conditions).
-    /// - Returns: `nil` if the condition is met, otherwise a message explaining why it failed.
+    ///   - attempt: The typed answer, for `.answer` conditions.
+    ///   - image: The user's photo, for `.image` conditions.
+    /// - Returns: `nil` if the condition is met, otherwise a message explaining why it isn't.
     func check(attempt: String? = nil, image: UIImage? = nil) async -> String? {
         let failure: String?
 
@@ -44,6 +51,7 @@ enum Condition: Codable {
 
     // MARK: - Private checks (each returns `nil` on success, or a failure reason)
 
+    /// Gets the user's current location and compares its distance to the target with `radius`.
     private func checkCoordinate(latitude: Double, longitude: Double, radius: Double) async -> String? {
         do {
             let userLocation = try await LocationTracker.currentLocation()
@@ -59,6 +67,7 @@ enum Condition: Codable {
         }
     }
 
+    /// Compares answers, ignoring case and surrounding whitespace.
     private func checkAnswer(attempt: String, answer: String) -> String? {
         let a = attempt.trimmingCharacters(in: .whitespacesAndNewlines)
         let b = answer.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -67,8 +76,10 @@ enum Condition: Codable {
         return a.caseInsensitiveCompare(b) == .orderedSame ? nil : "That answer isn't correct."
     }
 
-    /// Compares images using Vision feature prints. Lower distance = more similar.
-    /// Tune `threshold` to taste.
+    /// Compares images using Vision feature prints.
+    ///
+    /// - Parameter threshold: The maximum feature-print distance that counts as similar.
+    ///   Lower distances mean more similar images. Tune it to taste.
     private func checkSimilarity(reference: Data, attempt: UIImage, threshold: Float = 0.5) -> String? {
         guard let referenceCG = UIImage(data: reference)?.cgImage else {
             return "The reference image is missing or corrupted."
