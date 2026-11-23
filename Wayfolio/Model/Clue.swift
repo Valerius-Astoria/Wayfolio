@@ -22,6 +22,7 @@ import SwiftData
     /// The position of this clue within its waypoint.
     var order: Int
 
+    /// The waypoint this clue is hidden at.
     var waypoint: Waypoint
 
     init(name: String,
@@ -81,6 +82,7 @@ import SwiftData
         }
     }
 
+    /// Marks the clue as not checked, without checking `condition`.
     func uncheck() { self.isChecked = false }
 }
 

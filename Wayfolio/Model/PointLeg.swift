@@ -10,11 +10,12 @@ import SwiftData
 
 /// The journey between two consecutive waypoints.
 ///
-/// The route comes either from Apple Maps directions or from a path the user recorded
+/// The path comes either from Apple Maps directions or from a path the user recorded
 /// with `buildCustomRoute()`.
 @Model class PointLeg {
     var startingPoint: Waypoint
     var endPoint: Waypoint
+    /// How the user travels this leg.
     var transportType: TransportType
     /// The recorded path. Empty unless `buildCustomRoute()` has been run.
     var customCoordinates: [RouteCoordinate] = []
@@ -22,21 +23,22 @@ import SwiftData
     var expectedTravelTime: Double?
     /// Travel distance, in meters.
     var distance: Double?
-    /// The position of this leg within the adventure.
+    /// The position of this leg within its route.
     var order: Int
 
-    var adventure: Adventure
+    /// The route this leg belongs to.
+    var route: Route
 
     init(startingPoint: Waypoint,
          endPoint: Waypoint,
          transportType: TransportType,
          order: Int,
-         adventure: Adventure) {
+         route: Route) {
         self.startingPoint = startingPoint
         self.endPoint = endPoint
         self.transportType = transportType
         self.order = order
-        self.adventure = adventure
+        self.route = route
     }
 
     /// Whether the leg uses a recorded path instead of Apple Maps directions.

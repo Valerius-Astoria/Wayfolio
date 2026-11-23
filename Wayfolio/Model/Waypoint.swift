@@ -24,21 +24,26 @@ import SwiftData
     var url: URL?
     /// An SF Symbol name for the map marker.
     var icon: String
+    /// A one-line summary shown in lists.
     var brief: String
+    /// The full introduction shown on the detail page.
     var intro: String?
+    /// The place's opening hours. `nil` if unknown.
     var hours: Hours?
+    /// When the user plans to visit.
     var schedule: Schedule
+    /// Whether the user has visited the place. Set by `check()`.
     var isChecked: Bool
     /// What the user must do to check this waypoint. See `check()`.
     var condition: Condition = Condition.noCondition
-    /// The position of this waypoint within its day.
+    /// The position of this waypoint within its route.
     var order: Int
-    var isEnd: Bool // An adventure is divided into multiple legs so users can stop for rest or meals. This variable indicates if the current waypoint is the end of a route segment (i.e., the start of a pointleg).
 
-
+    /// Clues hidden at the place. Deleting the waypoint deletes them too.
     @Relationship(deleteRule: .cascade, inverse: \Clue.waypoint)
     var clues: [Clue] = []
-    var adventure: Adventure
+    /// The route this waypoint belongs to.
+    var route: Route
 
     /// Creates a waypoint from an Apple Maps point of interest.
     ///
@@ -46,11 +51,12 @@ import SwiftData
     /// - Parameters:
     ///   - item: The map item to create the waypoint from.
     ///   - intro: An introduction to the place.
+    ///   - brief: A one-line summary of the place.
     ///   - hours: The place's opening hours.
     ///   - schedule: When the user plans to visit.
     ///   - isChecked: Whether the user has already checked the place.
-    ///   - order: The position of this waypoint within its day.
-    ///   - adventure: The adventure this waypoint belongs to.
+    ///   - order: The position of this waypoint within its route.
+    ///   - route: The route this waypoint belongs to.
     init(item: MKMapItem,
          intro: String?,
          brief: String,
@@ -58,8 +64,7 @@ import SwiftData
          schedule: Schedule,
          isChecked: Bool = false,
          order: Int,
-         adventure: Adventure,
-         isEnd: Bool) {
+         route: Route,) {
         self.name = item.name ?? "Unknown Place"
         self.latitude = item.location.coordinate.latitude
         self.longitude = item.location.coordinate.longitude
@@ -75,8 +80,7 @@ import SwiftData
         self.schedule = schedule
         self.isChecked = isChecked
         self.order = order
-        self.adventure = adventure
-        self.isEnd = isEnd
+        self.route = route
     }
 
     /// Creates a custom waypoint that isn't an Apple Maps point of interest.
@@ -84,12 +88,13 @@ import SwiftData
     /// - Parameters:
     ///   - icon: An SF Symbol name for the map marker. Only custom places can choose their icon.
     ///   - intro: An introduction to the place.
+    ///   - brief: A one-line summary of the place.
     ///   - hours: The place's opening hours.
     ///   - schedule: When the user plans to visit.
     ///   - isChecked: Whether the user has already checked the place.
     ///   - clues: Clues hidden at the place.
-    ///   - order: The position of this waypoint within its day.
-    ///   - adventure: The adventure this waypoint belongs to.
+    ///   - order: The position of this waypoint within its route.
+    ///   - route: The route this waypoint belongs to.
     init(name: String,
          latitude: Double,
          longitude: Double,
@@ -105,8 +110,7 @@ import SwiftData
          isChecked: Bool = false,
          clues: [Clue] = [],
          order: Int,
-         adventure: Adventure,
-         isEnd: Bool) {
+         route: Route) {
         self.name = name
         self.latitude = latitude
         self.longitude = longitude
@@ -122,8 +126,7 @@ import SwiftData
         self.isChecked = isChecked
         self.clues = clues
         self.order = order
-        self.adventure = adventure
-        self.isEnd = isEnd
+        self.route = route
     }
 
     /// Whether the waypoint comes from an Apple Maps point of interest.
@@ -179,6 +182,7 @@ import SwiftData
         hours?.isOpen()
     }
 
+    /// Adds `clue` to the end of `clues`.
     func addClue(clue: Clue) {
         clues.append(clue)
     }
@@ -186,17 +190,20 @@ import SwiftData
 
 /// A place's opening hours on one day of the week.
 ///
-/// Times are stored as minutes since midnight, because SwiftData can't store `DateComponents`.
+/// Times are stored as separate hour and minute values, because SwiftData can't store `DateComponents`.
 struct Hours: Codable {
     /// Raw values match `Calendar`'s `weekday` component (Sunday is `1`).
     enum WeekDay: Int, Codable, CaseIterable { case Sun = 1, Mon, Tue, Wed, Thu, Fri, Sat }
 
     let day: WeekDay
-    /// Opening time, in minutes since midnight.
+    /// The minute of the opening time, from `0` to `59`.
     var startMinute: Int?
+    /// The hour of the opening time, from `0` to `23`.
     var startHour: Int?
-    /// Closing time, in minutes since midnight. May be earlier than `startMinute` for overnight hours.
+    /// The minute of the closing time, from `0` to `59`.
     var endMinute: Int?
+    /// The hour of the closing time, from `0` to `23`.
+    /// The closing time may be earlier than the opening time for overnight hours.
     var endHour: Int?
 
     /// Sets the hours to open all day.
@@ -233,29 +240,40 @@ struct Hours: Codable {
 
 /// When the user plans to visit a place.
 ///
-/// Times are stored as minutes since midnight, because SwiftData can't store `DateComponents`.
+/// Times are stored as separate hour and minute values, because SwiftData can't store `DateComponents`.
 struct Schedule: Codable {
-    /// The day of the adventure, starting from `1`.
-    var day: Int
     var startHour: Int
     var startMinute: Int
     var endHour: Int
     var endMinute: Int
 
-    init(startHour: Int, startMinute: Int, endHour: Int, endMinute: Int, on day: Int) {
-        self.day = day
+    init(startHour: Int, startMinute: Int, endHour: Int, endMinute: Int) {
         self.startHour = startHour
         self.startMinute = startMinute
         self.endHour = endHour
         self.endMinute = endMinute
     }
-    
+
+    /// The start time, in minutes since midnight.
     var startMinutes: Int {
         startHour * 60 + startMinute
     }
-    
+
+    /// The end time, in minutes since midnight.
     var endMinutes: Int {
         endHour * 60 + endMinute
+    }
+
+    /// How long the visit lasts, in minutes.
+    var stayMinutes: Int {
+        endMinutes - startMinutes
+    }
+
+    /// The time range formatted for display, such as `"9:05-10:30"`.
+    func display() -> String {
+        let startMinuteString = startMinute < 10 ? "0\(startMinute)" : "\(startMinute)"
+        let endMinuteString = endMinute < 10 ? "0\(endMinute)" : "\(endMinute)"
+        return("\(startHour):\(startMinuteString)-\(endHour):\(endMinuteString)")
     }
 }
 
