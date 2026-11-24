@@ -107,3 +107,43 @@ enum Condition: Codable {
         }
     }
 }
+
+extension Condition: Comparable {
+    var label: IconLabel? {
+        switch self {
+        case .noCondition:
+            nil
+        case .coordinate(_, _, _):
+            IconLabel(icon: "mappin.circle", color: .orange)
+        case .image(_):
+            IconLabel(icon: "photo", color: .orange)
+        case .answer(_):
+            IconLabel(icon: "pencil.circle", color: .orange)
+        }
+    }
+    
+    private var sortOrder: Int {
+        switch self {
+        case .noCondition: 0
+        case .coordinate:  1
+        case .image:       2
+        case .answer:      3
+        }
+    }
+    
+    static func < (lhs: Condition, rhs: Condition) -> Bool {
+        if lhs.sortOrder != rhs.sortOrder {
+            return lhs.sortOrder < rhs.sortOrder
+        }
+        
+        // Optional: Tie-break identical cases by their associated values
+        switch (lhs, rhs) {
+        case let (.answer(a), .answer(b)):
+            return a.localizedStandardCompare(b) == .orderedAscending
+        case let (.coordinate(_, _, r1), .coordinate(_, _, r2)):
+            return r1 < r2
+        default:
+            return false
+        }
+    }
+}

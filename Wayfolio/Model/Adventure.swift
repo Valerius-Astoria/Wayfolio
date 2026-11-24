@@ -13,20 +13,16 @@ internal import System
 /// A multi-day trip, split into routes that each hold the waypoints to visit and the legs between them.
 @Model class Adventure {
     var name: String
-    /// A one-line summary shown in lists.
-    var brief: String
-    /// The full introduction shown on the detail page.
+    var brief: String?
     var intro: String
-    /// Practical tips for the trip, such as transport or weather advice.
+    var region: String
+    var status: Status
+    
     var notes: [Note] = []
     /// The path the user actually walked, recorded by `track(maxAccuracy:minimumDistance:)`.
     var trace: [RouteCoordinate] = []
     /// The categories the adventure belongs to, shown as icons. See `AdventureType.label`.
     var types: [AdventureType] = []
-    /// The user's progress through the adventure.
-    var status: Status = Status.notStarted
-    /// The city or area where the adventure takes place, such as "Shanghai".
-    var region: String
     /// Free-form keywords used by `search(query:in:)`, such as the book or movie it's based on.
     var tags: [String] = []
 
@@ -37,23 +33,22 @@ internal import System
     @Relationship(deleteRule: .cascade, inverse: \Route.adventure)
     var routes: [Route] = []
 
-    init(name: String, brief: String, intro: String, notes: [Note] = [], types: [AdventureType] = [], region: String, tags: [String], image: Data) {
+    init(name: String,
+         brief: String?,
+         intro: String,
+         types: [AdventureType] = [],
+         region: String,
+         status: Status = .notStarted,
+         tags: [String],
+         image: Data) {
         self.name = name
         self.brief = brief
         self.intro = intro
-        self.notes = notes
+        self.status = status
         self.types = types
         self.region = region
         self.tags = tags
         self.image = image
-    }
-
-    /// Whether the adventure is complete, meaning every waypoint in every route is checked.
-    ///
-    /// `true` for an adventure with no routes, and `false` if any route has no waypoints
-    /// (see `Route.percentage`).
-    var isChecked: Bool {
-        routes.allSatisfy { $0.percentage == 1 }
     }
 
     /// The total number of waypoints across all routes.

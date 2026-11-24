@@ -15,18 +15,13 @@ import SwiftData
 @Model class PointLeg {
     var startingPoint: Waypoint
     var endPoint: Waypoint
-    /// How the user travels this leg.
     var transportType: TransportType
-    /// The recorded path. Empty unless `buildCustomRoute()` has been run.
+    
     var customCoordinates: [RouteCoordinate] = []
-    /// Travel time, in seconds.
     var expectedTravelTime: Double?
-    /// Travel distance, in meters.
     var distance: Double?
-    /// The position of this leg within its route.
     var order: Int
 
-    /// The route this leg belongs to.
     var route: Route
 
     init(startingPoint: Waypoint,
@@ -41,7 +36,6 @@ import SwiftData
         self.route = route
     }
 
-    /// Whether the leg uses a recorded path instead of Apple Maps directions.
     var useCustomRoute: Bool { !customCoordinates .isEmpty }
 
     /// The recorded path as coordinates, ready for drawing a `MapPolyline`.

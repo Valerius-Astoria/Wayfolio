@@ -16,32 +16,8 @@ struct AdventureDetail: View {
 
     var body: some View {
         VStack(alignment: .leading) {
-            HStack {
-                if let uiImage = UIImage(data: adventure.image) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 90, height: 120)
-                        .clipShape(.rect(cornerRadius: 8))
-                        .accessibilityHidden(true)
-                }
-                VStack(alignment: .leading) {
-                    HStack {
-                        Text(adventure.name).font(.title2).bold()
-                    }
-                    Text(adventure.brief).font(.subheadline).foregroundStyle(.gray)
-                    HStack {
-                        Text("\(adventure.routes.count) routes · \(adventure.waypointCount) places · \(adventure.dayCount) days")
-                            .padding(.trailing)
-                        ForEach(adventure.types.sorted(), id: \.self) { type in
-                            Image(systemName: type.label.icon)
-                                .foregroundStyle(type.label.color)
-                        }
-                    }
-                    .font(.footnote)
-                }
-            }
-            .padding(.horizontal)
+            AdventureRow(adventure: adventure, imageWidth: 84, imageHeight: 112, font: .footnote)
+                .padding(.horizontal)
             
             List {
                 Section("Introduction") {
@@ -83,16 +59,16 @@ struct RouteRow: View {
             VStack(alignment: .leading) {
                 HStack {
                     Text(route.name).font(.headline)
-                    Text("(\(route.schedule().display()))").font(.subheadline)
+                    Text("(\(route.schedule.display()))").font(.subheadline)
                 }
-                HStack {
-                    Text(route.brief)
-                    Spacer()
-                    Text("🕍: \(route.waypoints.count { $0.isChecked }) / \(route.waypoints.count)")
-                        .font(.footnote)
+                if let brief = route.brief {
+                    Text(brief).font(.subheadline)
                 }
-                .font(.subheadline)
             }
+            Spacer()
+            Text("\(route.waypoints.count { $0.isChecked }) / \(route.waypoints.count)")
+                .font(.footnote)
+            
             Image(systemName: "chevron.right")
                 .foregroundStyle(.gray)
         }

@@ -11,27 +11,21 @@ import SwiftData
 /// A clue hidden at a waypoint, which the user unlocks by meeting its `condition`.
 @Model class Clue {
     var name: String
-    /// A one-line summary shown before the clue is opened.
-    var brief: String
-    var detail: String?
-    /// An SF Symbol name.
+    var brief: String?
+    var detail: String
     var icon: String
     var isChecked: Bool
-    /// What the user must do to check this clue. See `check(attempt:image:)`.
-    var condition: Condition
-    /// The position of this clue within its waypoint.
+    var conditions: [Condition] = []
     var order: Int
 
-    /// The waypoint this clue is hidden at.
     var waypoint: Waypoint
 
     init(name: String,
-         brief: String,
-         detail: String? = nil,
+         brief: String? = nil,
+         detail: String,
          icon: String = "folder",
          isChecked: Bool = false,
          waypoint: Waypoint,
-         condition: Condition = .noCondition,
          order: Int) {
         self.name = name
         self.brief = brief
@@ -39,20 +33,25 @@ import SwiftData
         self.icon = icon
         self.isChecked = isChecked
         self.waypoint = waypoint
-        self.condition = condition
         self.order = order
+    }
+    
+    /// One label for each kind of condition used by the clues, sorted by icon name.
+    var icons: [IconLabel] {
+        Set(conditions.compactMap(\.label))
+            .sorted { $0.icon < $1.icon }
     }
 
     // MARK: - Setting conditions
 
     /// Requires the user to be within `radius` meters of the given coordinate.
     func addCoordinateCondition(latitude: Double, longitude: Double, radius: Double) {
-        self.condition = .coordinate(latitude: latitude, longitude: longitude, radius: radius)
+        self.conditions.append(.coordinate(latitude: latitude, longitude: longitude, radius: radius))
     }
 
     /// Requires the user to type `answer`. Case and surrounding whitespace are ignored.
     func addAnswerCondition(answer: String) {
-        self.condition = .answer(answer)
+        self.conditions.append(.answer(answer))
     }
 
     /// Requires the user to take a photo similar to `uiImage`.
@@ -61,7 +60,7 @@ import SwiftData
     /// - Returns: `false` if the image can't be compressed, in which case the condition is unchanged.
     func addSimilarityCondition(uiImage: UIImage) -> Bool {
         guard let data = uiImage.jpegData(compressionQuality: 0.8) else { return false }
-        self.condition = .image(data)
+        self.conditions.append(.image(data))
         return true
     }
 
@@ -74,15 +73,14 @@ import SwiftData
     ///   - image: The user's photo, for `.image` conditions.
     /// - Returns: `nil` if the condition is met, otherwise a message explaining why it isn't.
     func check(attempt: String? = nil, image: UIImage? = nil) async -> String? {
-        if let errorMessage = await condition.check(attempt: attempt, image: image) {
-            return errorMessage
-        } else {
-            isChecked = true
-            return nil
+        for condition in conditions {
+            // Each condition should have diffierent types, therefore they can all be checked by `condition.check(attempt: attempt, image: image)`.
+            if let errorMessage = await condition.check(attempt: attempt, image: image) {
+                return errorMessage
+            }
         }
+        isChecked = true
+        return nil
     }
-
-    /// Marks the clue as not checked, without checking `condition`.
-    func uncheck() { self.isChecked = false }
 }
 

@@ -13,8 +13,10 @@ struct RouteDetail: View {
     
     var body: some View {
         List {
-            Section("Introduction") {
-                ExpandableText(route.intro)
+            if let intro = route.intro {
+                Section("Introduction") {
+                    ExpandableText(intro)
+                }
             }
             Section("Schedule") {
                 Timeline(route: route)
@@ -23,7 +25,7 @@ struct RouteDetail: View {
         .navigationTitle(route.name)
         .navigationBarTitleDisplayMode(.inline)
         .listStyle(.plain)
-        .environment(\.defaultMinListRowHeight, 0) // Lets the leg rows be shorter than a normal row.
+        .environment(\.defaultMinListRowHeight, 0)
     }
 }
 
@@ -40,7 +42,7 @@ struct Timeline: View {
     var body: some View {
         ForEach(route.orderedWaypoints, id: \.self) { waypoint in
             NavigationLink {
-                Text("Waypoint Detail")
+                WaypointDetail(waypoint: waypoint)
             } label: {
                 waypointRow(waypoint)
             }

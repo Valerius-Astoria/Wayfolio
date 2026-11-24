@@ -20,7 +20,7 @@ struct SearchSheet: View {
                 NavigationLink {
                     AdventureDetail(adventure: adventure)
                 } label: {
-                    AdventureRow(adventure: adventure)
+                    AdventureRow(adventure: adventure, font: .caption.bold())
                 }
             }
             .navigationTitle("Search")
@@ -33,26 +33,32 @@ struct SearchSheet: View {
 /// A list row showing an adventure's name, brief, size, and type icons.
 struct AdventureRow: View {
     let adventure: Adventure
+    let imageWidth: CGFloat
+    let imageHeight: CGFloat
+    let font: Font
+    
+    init(adventure: Adventure, imageWidth: CGFloat = 54, imageHeight: CGFloat = 72, font: Font) {
+        self.adventure = adventure
+        self.imageWidth = imageWidth
+        self.imageHeight = imageHeight
+        self.font = font
+    }
     
     var body: some View {
-        HStack {
+        HStack(alignment: .bottom) {
             if let uiImage = UIImage(data: adventure.image) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 54, height: 72)
-                        .clipShape(.rect(cornerRadius: 8))
-                        .accessibilityHidden(true)
-                } else {
-                    Image(systemName: "map")
-                }
+                Image(uiImage: uiImage)
+                    .thumbnailStyle(width: imageWidth, height: imageHeight)
+            } else {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color(.systemGray5))
+                    .frame(width: 53, height: 72)
+            }
             VStack(alignment: .leading) {
-                VStack(alignment: .leading) {
-                    Text(adventure.name).font(.headline)
-                        .padding(.trailing)
-                    Text(adventure.brief).font(.subheadline).foregroundStyle(.gray)
+                Text(adventure.name).font(.headline)
+                if let brief = adventure.brief {
+                    Text(brief).font(.subheadline).foregroundStyle(.secondary)
                 }
-                
                 HStack {
                     Text("\(adventure.routes.count) routes · \(adventure.waypointCount) places · \(adventure.dayCount) days")
                         .padding(.trailing)
@@ -61,8 +67,7 @@ struct AdventureRow: View {
                             .foregroundStyle(type.label.color)
                     }
                 }
-                .font(.caption)
-                .bold()
+                .font(font)
             }
         }
         

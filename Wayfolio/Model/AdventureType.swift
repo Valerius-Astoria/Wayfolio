@@ -17,25 +17,20 @@ enum AdventureType: Int, Codable, Comparable {
         lhs.rawValue < rhs.rawValue
     }
 
-    case hiking = 0, cityWalk, festival
-    /// Visiting real places from books, movies, games, and other stories.
-    case pilgrimage
+    case hiking = 0, cityWalk, festival, pilgrimage
 
     /// The display name, icon, and color for this type.
-    var label: AdventureLabel {
+    var label: IconLabel {
         switch self {
-        case .hiking:     AdventureLabel(name: "hiking",     icon: "figure.hiking",     color: .green)
-        case .cityWalk:   AdventureLabel(name: "city walk",  icon: "building.2.fill",   color: .orange)
-        case .festival:   AdventureLabel(name: "festival",   icon: "party.popper.fill", color: .pink)
-        case .pilgrimage: AdventureLabel(name: "pilgrimage", icon: "book.pages.fill",   color: .indigo)
+        case .hiking:     IconLabel(icon: "figure.hiking",     color: .green)
+        case .cityWalk:   IconLabel(icon: "building.2.fill",   color: .orange)
+        case .festival:   IconLabel(icon: "party.popper.fill", color: .pink)
+        case .pilgrimage: IconLabel(icon: "book.pages.fill",   color: .indigo)
         }
     }
 }
 
-/// How an `AdventureType` is displayed.
-struct AdventureLabel {
-    var name: String
-    /// An SF Symbol name.
+struct IconLabel: Hashable {
     var icon: String
     var color: Color
 }
