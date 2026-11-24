@@ -19,7 +19,12 @@ struct ClueDetail: View {
     @State private var locationError: String?
     @State private var isComparingImage = false
     @State private var isCheckingLocation = false
-    
+
+    init(clue: Clue) {
+        self.clue = clue
+        _answer = State(initialValue: clue.question?.response ?? "")
+    }
+
     var body: some View {
         List {
             Section("Description") {
@@ -82,6 +87,8 @@ struct ClueDetail: View {
                         Text(question.question)
                         HStack {
                             TextField("Your answer", text: $answer)
+                                .disabled(question.isChecked)
+                                .onSubmit { questionAttemptCount += 1 }
                             Spacer()
                             if !answer.isEmpty {
                                 if question.isChecked {
@@ -99,14 +106,15 @@ struct ClueDetail: View {
                     }
                 }
                 .task(id: answer) {
+                    // Skip the initial run, when `answer` was just loaded from the stored response.
+                    guard answer != question.response ?? "" else { return }
                     do {
-                        questionAttemptCount += 1
                         try question.check(answer: answer)
-                        clue.question = question
                         questionError = nil
                     } catch {
                         questionError = error.localizedDescription
                     }
+                    clue.question = question
                 }
             }
             

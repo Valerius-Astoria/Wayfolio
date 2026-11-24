@@ -106,14 +106,19 @@ struct QuestionCondition: Checkable, Codable, Hashable {
     var question: String
     /// Case and surrounding whitespace are ignored when checking.
     var answer: String
+    /// The user's latest attempt, kept so it can be shown again. Optional so data saved before it existed still decodes.
+    var response: String?
     var isChecked = false
     var hint: String
-    var threshhold = 8
+    var threshhold = 5
 
     static let label = IconLabel(icon: "pencil.circle", color: .orange)
 
-    /// - Throws: `ConditionFailure` if `attempt` is empty or wrong.
+    /// Stores `attempt` as `response`, then compares it with `answer`.
+    ///
+    /// - Throws: `ConditionFailure` if `attempt` is wrong.
     mutating func check(answer attempt: String?) throws {
+        response = attempt
         let attempt = attempt?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !attempt.isEmpty else { return }
 
