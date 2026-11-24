@@ -10,140 +10,130 @@ import SwiftUI
 import Vision
 import MapKit
 
-/// A requirement the user must meet to check a waypoint or clue.
-enum Condition: Codable {
-    /// Always met.
-    case noCondition
-    /// Met when the user is within `radius` meters of the coordinate.
-    case coordinate(latitude: Double, longitude: Double, radius: Double)
-    /// Met when the user's photo looks similar to this reference image (JPEG data).
-    case image(Data)
-    /// Met when the user types this answer. Case and surrounding whitespace are ignored.
-    case answer(String)
+// Each kind of condition is its own type, so a clue or waypoint can hold at most one of each,
+// and each check only takes the input it needs.
 
-    // MARK: - Checking
+/// Met when the user is within `radius` meters of a coordinate.
+struct LocationCondition: Checkable, Codable, Hashable {
+    var latitude: Double
+    var longitude: Double
+    var radius: Double
+    var isChecked = false
+    var guide = "Move to the right position"
 
-    /// Checks whether the condition is met.
-    ///
-    /// This doesn't change any state. The caller is responsible for marking its waypoint or clue as checked.
-    /// - Parameters:
-    ///   - attempt: The typed answer, for `.answer` conditions.
-    ///   - image: The user's photo, for `.image` conditions.
-    /// - Returns: `nil` if the condition is met, otherwise a message explaining why it isn't.
-    func check(attempt: String? = nil, image: UIImage? = nil) async -> String? {
-        let failure: String?
-
-        switch self {
-        case .noCondition:
-            failure = nil
-        case .coordinate(let latitude, let longitude, let radius):
-            failure = await checkCoordinate(latitude: latitude, longitude: longitude, radius: radius)
-        case .image(let data):
-            guard let image else { return "No photo was provided." }
-            failure = checkSimilarity(reference: data, attempt: image)
-        case .answer(let answer):
-            guard let attempt else { return "No answer was provided." }
-            failure = checkAnswer(attempt: attempt, answer: answer)
-        }
-
-        return failure
-    }
-
-    // MARK: - Private checks (each returns `nil` on success, or a failure reason)
+    static let label = IconLabel(icon: "mappin.circle", color: .orange)
 
     /// Gets the user's current location and compares its distance to the target with `radius`.
-    private func checkCoordinate(latitude: Double, longitude: Double, radius: Double) async -> String? {
-        do {
-            let userLocation = try await LocationTracker.currentLocation()
-            let target = CLLocation(latitude: latitude, longitude: longitude)
-            let distance = userLocation.distance(from: target)   // meters
-
-            if distance <= radius { return nil }
-            return "You're about \(Int(distance.rounded())) m away. Get within \(Int(radius.rounded())) m of the spot."
-        } catch let error as LocationError {
-            return error.message
-        } catch {
-            return "Couldn't get your location: \(error.localizedDescription)"
-        }
-    }
-
-    /// Compares answers, ignoring case and surrounding whitespace.
-    private func checkAnswer(attempt: String, answer: String) -> String? {
-        let a = attempt.trimmingCharacters(in: .whitespacesAndNewlines)
-        let b = answer.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if a.isEmpty { return "The answer is empty." }
-        return a.caseInsensitiveCompare(b) == .orderedSame ? nil : "That answer isn't correct."
-    }
-
-    /// Compares images using Vision feature prints.
     ///
-    /// - Parameter threshold: The maximum feature-print distance that counts as similar.
-    ///   Lower distances mean more similar images. Tune it to taste.
-    private func checkSimilarity(reference: Data, attempt: UIImage, threshold: Float = 0.5) -> String? {
-        guard let referenceCG = UIImage(data: reference)?.cgImage else {
-            return "The reference image is missing or corrupted."
-        }
-        guard let attemptCG = attempt.cgImage else {
-            return "Couldn't read the photo you provided."
-        }
-
-        func featurePrint(for cgImage: CGImage) throws -> VNFeaturePrintObservation? {
-            let request = VNGenerateImageFeaturePrintRequest()
-            try VNImageRequestHandler(cgImage: cgImage).perform([request])
-            return request.results?.first
-        }
-
+    /// - Throws: `ConditionFailure` if the user's location isn't available or the user is too far away.
+    mutating func check() async throws {
+        let userLocation: CLLocation
         do {
-            guard let a = try featurePrint(for: referenceCG),
-                  let b = try featurePrint(for: attemptCG) else {
-                return "Couldn't analyze the images."
-            }
-            var distance: Float = 0
-            try a.computeDistance(&distance, to: b)
-            return distance < threshold ? nil : "Your photo doesn't look similar enough to the target."
+            userLocation = try await LocationTracker.currentLocation()
+        } catch let error as LocationError {
+            throw ConditionFailure(error.message)
         } catch {
-            return "Image comparison failed: \(error.localizedDescription)"
+            throw ConditionFailure("Your location isn't available: \(error.localizedDescription)")
         }
+
+        let distance = userLocation.distance(from: CLLocation(latitude: latitude, longitude: longitude))
+
+        guard distance <= radius else {
+            throw ConditionFailure("You're about \(Int(distance.rounded())) m away. Get within \(Int(radius.rounded())) m of the spot.")
+        }
+        isChecked = true
     }
 }
 
-extension Condition: Comparable {
-    var label: IconLabel? {
-        switch self {
-        case .noCondition:
-            nil
-        case .coordinate(_, _, _):
-            IconLabel(icon: "mappin.circle", color: .orange)
-        case .image(_):
-            IconLabel(icon: "photo", color: .orange)
-        case .answer(_):
-            IconLabel(icon: "pencil.circle", color: .orange)
-        }
+/// Met when the user's photo looks similar to a reference photo.
+struct PhotoCondition: Checkable, Codable, Hashable {
+    var name: String
+    /// JPEG data.
+    var reference: Data
+    /// The maximum Vision feature-print distance that counts as similar. Lower means stricter.
+    var threshold: Float = 0.5
+    var isChecked = false
+
+    static let label = IconLabel(icon: "photo", color: .orange)
+
+    /// - Returns: `nil` if `image` can't be compressed.
+    init?(name: String, reference image: UIImage, threshold: Float = 0.5) {
+        guard let data = image.jpegData(compressionQuality: 0.8) else { return nil }
+        self.name = name
+        self.reference = data
+        self.threshold = threshold
     }
-    
-    private var sortOrder: Int {
-        switch self {
-        case .noCondition: 0
-        case .coordinate:  1
-        case .image:       2
-        case .answer:      3
+
+    var referenceImage: UIImage? { UIImage(data: reference) }
+
+    /// Compares `photo` with `reference` using Vision feature prints.
+    ///
+    /// - Throws: `ConditionFailure` if the photo isn't similar enough or can't be analyzed.
+    mutating func check(photo: UIImage?) throws {
+        guard let photo else { throw ConditionFailure("Take a photo first.") }
+        guard let referenceCG = referenceImage?.cgImage else {
+            throw ConditionFailure("The reference photo is missing or corrupted.")
         }
-    }
-    
-    static func < (lhs: Condition, rhs: Condition) -> Bool {
-        if lhs.sortOrder != rhs.sortOrder {
-            return lhs.sortOrder < rhs.sortOrder
+        guard let photoCG = photo.cgImage else {
+            throw ConditionFailure("Couldn't read the photo you provided.")
         }
         
-        // Optional: Tie-break identical cases by their associated values
-        switch (lhs, rhs) {
-        case let (.answer(a), .answer(b)):
-            return a.localizedStandardCompare(b) == .orderedAscending
-        case let (.coordinate(_, _, r1), .coordinate(_, _, r2)):
-            return r1 < r2
-        default:
-            return false
+        func featurePrint(for cgImage: CGImage) throws -> VNFeaturePrintObservation {
+            let request = VNGenerateImageFeaturePrintRequest()
+            try VNImageRequestHandler(cgImage: cgImage).perform([request])
+            guard let result = request.results?.first else { throw ConditionFailure("Couldn't analyze the photos.") }
+            return result
         }
+        
+        var distance: Float = 0
+        do {
+            try featurePrint(for: referenceCG).computeDistance(&distance, to: featurePrint(for: photoCG))
+        } catch let failure as ConditionFailure {
+            throw failure
+        } catch {
+            throw ConditionFailure("Photo comparison failed: \(error.localizedDescription)")
+        }
+        
+        guard distance < threshold else {
+            throw ConditionFailure("Your photo doesn't look similar enough to the target, only \(1-distance) similarity.")
+        }
+        isChecked = true
     }
+}
+
+/// Met when the user types the answer to a question.
+struct QuestionCondition: Checkable, Codable, Hashable {
+    var question: String
+    /// Case and surrounding whitespace are ignored when checking.
+    var answer: String
+    var isChecked = false
+    var hint: String
+    var threshhold = 8
+
+    static let label = IconLabel(icon: "pencil.circle", color: .orange)
+
+    /// - Throws: `ConditionFailure` if `attempt` is empty or wrong.
+    mutating func check(answer attempt: String?) throws {
+        let attempt = attempt?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !attempt.isEmpty else { return }
+
+        let answer = answer.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard attempt.caseInsensitiveCompare(answer) == .orderedSame else {
+            throw ConditionFailure("That answer isn't correct.")
+        }
+        isChecked = true
+    }
+}
+
+/// Why a condition isn't met, in a form that can be shown to the user.
+struct ConditionFailure: LocalizedError {
+    let message: String
+
+    init(_ message: String) { self.message = message }
+
+    var errorDescription: String? { message }
+}
+
+protocol Checkable {
+    var isChecked: Bool { get }
 }

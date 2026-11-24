@@ -18,7 +18,8 @@ import SwiftData
     var intro: String?
     var schedule: Schedule
     var isChecked: Bool
-    var condition: Condition = Condition.noCondition
+    /// Must be met to check the waypoint. `nil` means the user can check it at any time.
+    var location: LocationCondition?
     
     var latitude: Double
     var longitude: Double
@@ -129,21 +130,17 @@ import SwiftData
 
     // MARK: - Check the Waypoint
     
-    /// Requires the user to be within `radius` meters of the given coordinate to check this waypoint.
-    func addCoordinateCondition(latitude: Double, longitude: Double, radius: Double) {
-        self.condition = .coordinate(latitude: latitude, longitude: longitude, radius: radius)
+    /// Requires the user to be within `radius` meters of the waypoint to check it.
+    func requireArrival(within radius: Double = 50) {
+        location = LocationCondition(latitude: latitude, longitude: longitude, radius: radius)
     }
 
-    /// Checks `condition` and marks the waypoint as checked if it's met.
+    /// Checks `location` and marks the waypoint as checked if it's met.
     ///
-    /// - Returns: `nil` if the condition is met, otherwise a message explaining why it isn't.
-    func check() async -> String? {
-        if let errorMessage = await condition.check() {
-            return errorMessage
-        } else {
-            isChecked = true
-            return nil
-        }
+    /// - Throws: `ConditionFailure` or `LocationError` if the user isn't at the waypoint.
+    func check() async throws {
+        try await location?.check()
+        isChecked = true
     }
 }
 

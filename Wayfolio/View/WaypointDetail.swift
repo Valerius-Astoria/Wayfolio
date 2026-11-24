@@ -54,11 +54,16 @@ struct WaypointDetail: View {
                 Section("Clues") {
                     ForEach(waypoint.clues, id: \.self) { clue in
                         NavigationLink {
-                            Text("Clue Detail")
+                            ClueDetail(clue: clue)
                         } label: {
                             Label {
                                 VStack(alignment: .leading) {
                                     HStack {
+                                        if clue.isChecked {
+                                            Circle()
+                                                .fill(.green)
+                                                .frame(width: 9, height: 9)
+                                        }
                                         Text(clue.name)
                                         ForEach(clue.icons, id: \.self) { label in
                                             Image(systemName: label.icon)
@@ -91,7 +96,6 @@ struct WaypointDetail: View {
                                     .multilineTextAlignment(.trailing)
                                     .foregroundStyle(group.isClosed ? .red : .secondary)
                             }
-                            
                         }
                     }
                 } else {
@@ -101,18 +105,22 @@ struct WaypointDetail: View {
             Section("Details") {
                 HStack {
                     Text("Phone").padding(.trailing)
-                    Text(waypoint.phoneNumber ?? "Unknown").foregroundStyle(.secondary)
+                    Text(waypoint.phoneNumber ?? "Unknown")
+                        .foregroundStyle(.secondary)
                 }
                 HStack {
                     Text("Website").padding(.trailing)
-                    Text(waypoint.url?.absoluteString ?? "Unknown").foregroundStyle(.secondary)
+                    Text(waypoint.url?.absoluteString ?? "Unknown")
+                        .foregroundStyle(.secondary)
                 }
                 HStack {
                     Text("Address").padding(.trailing)
                     if (waypoint.fullAddress != nil) || waypoint.shortAddress != nil {
-                        Text(waypoint.fullAddress ?? "" + (waypoint.shortAddress ?? "") )
+                        Text(waypoint.fullAddress ?? "" + (waypoint.shortAddress ?? ""))
+                            .foregroundStyle(.secondary)
                     } else {
                         Text("Unknown")
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
