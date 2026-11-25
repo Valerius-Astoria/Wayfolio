@@ -78,6 +78,14 @@ internal import System
             trace.append(RouteCoordinate(location.coordinate))
         }
     }
+    
+    func deleteNotes(at offsets: IndexSet) {
+        notes.remove(atOffsets: offsets)
+    }
+    
+    func deleteRoutes(at offsets: IndexSet) {
+        routes.remove(atOffsets: offsets)
+    }
 
     // MARK: - Search
 

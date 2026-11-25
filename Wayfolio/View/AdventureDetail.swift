@@ -10,43 +10,61 @@ import SwiftUI
 /// An adventure's detail page: a header with the cover, name, and size,
 /// followed by its introduction, routes, and notes.
 struct AdventureDetail: View {
-    let adventure: Adventure
-    
     @State private var selectedRoute: Route?
+    /// Owned here rather than read from the environment, because this view is the one that sets it.
+    @State private var editMode: EditMode = .inactive
+    
+    @Bindable var adventure: Adventure
+    private var isEditing: Bool { editMode.isEditing }
 
     var body: some View {
         VStack(alignment: .leading) {
             AdventureRow(adventure: adventure, imageWidth: 84, imageHeight: 112, font: .footnote)
                 .padding(.horizontal)
             
-            List {
+            List() {
                 Section("Introduction") {
-                    ExpandableText(adventure.intro)
+                    if isEditing {
+                        TextField("Intro", text: $adventure.intro, axis: .vertical)
+                            .lineLimit(1...)
+                    } else {
+                        ExpandableText(adventure.intro)
+                    }
+                    
                 }
                 Section("Routes") {
-                    VStack {
-                        ForEach(adventure.routes, id: \.self) { route in
-                            Button {
-                                selectedRoute = route
-                            } label: {
-                                RouteRow(route: route)
-                            }
-                            .buttonStyle(.plain)
+                    ForEach(adventure.routes, id: \.self) { route in
+                        Button {
+                            selectedRoute = route
+                        } label: {
+                            RouteRow(route: route)
                         }
+                        .buttonStyle(.plain)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                        .listRowBackground(Color.clear)
                     }
+                    .onDelete(perform: adventure.deleteRoutes(at:))
                 }
+                
                 Section("Attention") {
                     ForEach(adventure.notes) { note in
                         Label(note.body, systemImage: note.icon)
                             .font(.subheadline)
+                            .listRowBackground(Color.clear)
                     }
+                    .onDelete(perform: adventure.deleteNotes(at:))
                 }
             }
             .listStyle(.plain)
             .navigationDestination(item: $selectedRoute) { route in
                 RouteDetail(route: route)
             }
+            .toolbar {
+                EditButton()
+            }
         }
+        .environment(\.editMode, $editMode)
     }
 }
 
