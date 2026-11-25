@@ -97,6 +97,13 @@ import SwiftData
     ///
     /// - Returns: `nil` if the opening hours are unknown. See `Hours.isOpen(at:)`.
     var isOpening: Bool? { hours?.isOpen() }
+    
+    func deleteClues(at offsets: IndexSet) {
+        let doomed = offsets.map { clues[$0] }
+        for clue in doomed {
+            modelContext?.delete(clue)
+        }
+    }
 
     // MARK: - GET MKMapItem
     

@@ -21,7 +21,7 @@ struct LocationCondition: Checkable, Codable, Hashable {
     var isChecked = false
     var guide = "Move to the right position"
 
-    static let label = IconLabel(icon: "mappin.circle", color: .orange)
+    static let label = IconLabel(name: "location", icon: "mappin.circle", color: .orange)
 
     /// Gets the user's current location and compares its distance to the target with `radius`.
     ///
@@ -54,7 +54,7 @@ struct PhotoCondition: Checkable, Codable, Hashable {
     var threshold: Float = 0.5
     var isChecked = false
 
-    static let label = IconLabel(icon: "photo", color: .orange)
+    static let label = IconLabel(name: "photo", icon: "photo", color: .orange)
 
     /// - Returns: `nil` if `image` can't be compressed.
     init?(name: String, reference image: UIImage, threshold: Float = 0.5) {
@@ -112,7 +112,7 @@ struct QuestionCondition: Checkable, Codable, Hashable {
     var hint: String
     var threshhold = 5
 
-    static let label = IconLabel(icon: "pencil.circle", color: .orange)
+    static let label = IconLabel(name: "question", icon: "pencil.circle", color: .orange)
 
     /// Stores `attempt` as `response`, then compares it with `answer`.
     ///

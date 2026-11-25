@@ -83,8 +83,12 @@ internal import System
         notes.remove(atOffsets: offsets)
     }
     
-    func deleteRoutes(at offsets: IndexSet) {
-        routes.remove(atOffsets: offsets)
+    /// Deletes `doomedRoutes`, along with their waypoints and legs.
+    func delete(_ doomedRoutes: [Route]) {
+        routes.removeAll { doomedRoutes.contains($0) }
+        for route in doomedRoutes {
+            modelContext?.delete(route)
+        }
     }
 
     // MARK: - Search

@@ -51,6 +51,7 @@ import SwiftData
         let request = MKDirections.Request()
         await request.source = startingPoint.getMKMapItem()
         await request.destination = endPoint.getMKMapItem()
+        request.transportType = transportType.directionsTransportType
         let route = try await MKDirections(request: request).calculate().routes.first
         self.expectedTravelTime = route?.expectedTravelTime
         self.distance = route?.distance
@@ -103,7 +104,7 @@ struct RouteCoordinate: Codable, Hashable {
 }
 
 /// How the user travels along a leg.
-enum TransportType: Codable {
+enum TransportType: CaseIterable, Codable {
     case walking, cycling, automobile, transit
 
     /// An SF Symbol name for the transport type.
@@ -120,17 +121,31 @@ enum TransportType: Codable {
         }
     }
 
-    /// A short display name, such as "walk".
-    var label: String {
+    /// The matching transport type for an Apple Maps directions request.
+    var directionsTransportType: MKDirectionsTransportType {
         switch self {
         case .walking:
-            "walk"
+            .walking
         case .cycling:
-            "ride"
+            .cycling
         case .automobile:
-            "drive"
+            .automobile
         case .transit:
-            "public"
+            .transit
+        }
+    }
+
+    /// A short display name, such as "walk".
+    var label: IconLabel {
+        switch self {
+        case .walking:
+            IconLabel(name: "walking", icon: "figure.walk")
+        case .cycling:
+            IconLabel(name: "ride", icon: "bicycle")
+        case .automobile:
+            IconLabel(name: "drive", icon: "car.fill")
+        case .transit:
+            IconLabel(name: "public", icon: "bus.fill")
         }
     }
 }

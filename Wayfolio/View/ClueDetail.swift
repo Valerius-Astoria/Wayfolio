@@ -19,6 +19,8 @@ struct ClueDetail: View {
     @State private var locationError: String?
     @State private var isComparingImage = false
     @State private var isCheckingLocation = false
+    /// Whether the checkmark that replaces the Check button is showing. It hides itself shortly after appearing.
+    @State private var isShowingCheckmark = false
 
     init(clue: Clue) {
         self.clue = clue
@@ -163,29 +165,42 @@ struct ClueDetail: View {
         .navigationTitle(clue.name)
         .navigationBarTitleDisplayMode(.inline)
         
-        if clue.photo == nil, clue.location == nil, clue.question == nil {
+        if clue.photo == nil, clue.location == nil, clue.question == nil,
+           !clue.isChecked || isShowingCheckmark {
             HStack {
+                Spacer()
                 if !clue.isChecked {
-                    
-                    Button {
-                        clue.ismanualChecked = true
-                    } label: {
-                        Spacer()
+                    Button(action: checkManually) {
                         Text("Check")
                             .padding(.horizontal, 20)
                             .padding(.vertical, 10)
-                            .background(.brown, in: RoundedRectangle(cornerRadius: 10))
+                            .background(.blue, in: RoundedRectangle(cornerRadius: 10))
                             .foregroundStyle(.white)
                             .font(.title3)
                     }
-                    .padding()
-                } else {
-                    Spacer()
+                    .transition(.scale.combined(with: .opacity))
+                } else if isShowingCheckmark {
                     Image(systemName: "checkmark.circle.fill")
+                        .padding(.horizontal, 20)
                         .font(.system(size: 40))
                         .foregroundStyle(.green)
-                        .padding(.horizontal, 20)
+                        .transition(.scale.combined(with: .opacity))
                 }
+            }
+            .padding()
+        }
+    }
+
+    /// Marks a clue with no conditions as checked, turning the Check button into a checkmark that then fades away.
+    private func checkManually() {
+        withAnimation(.spring(duration: 0.4, bounce: 0.4)) {
+            clue.ismanualChecked = true
+            isShowingCheckmark = true
+        }
+        Task {
+            try? await Task.sleep(for: .seconds(1))
+            withAnimation(.easeOut(duration: 0.3)) {
+                isShowingCheckmark = false
             }
         }
     }

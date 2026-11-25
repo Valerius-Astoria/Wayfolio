@@ -9,13 +9,17 @@ import SwiftUI
 
 /// A route's detail page: its introduction and a timeline of its waypoints.
 struct RouteDetail: View {
-    let route: Route
+    /// Owned here rather than read from the environment, because this view is the one that sets it.
+    @State private var editMode: EditMode = .inactive
+    
+    @Bindable var route: Route
+    private var isEditing: Bool { editMode.isEditing }
     
     var body: some View {
         List {
-            if let intro = route.intro {
+            if isEditing || route.intro != nil {
                 Section("Introduction") {
-                    ExpandableText(intro)
+                    TextField("Intro", text: $route.intro.orEmpty, axis: .vertical)
                 }
             }
             Section("Schedule") {
@@ -26,7 +30,17 @@ struct RouteDetail: View {
         .navigationBarTitleDisplayMode(.inline)
         .listStyle(.plain)
         .environment(\.defaultMinListRowHeight, 0)
+        .toolbar {
+            EditButton()
+        }
+        .environment(\.editMode, $editMode)
+        .task(id: route.pointLegs) {
+            for pointLeg in route.pointLegs where pointLeg.distance == nil && !pointLeg.useCustomRoute {
+                _ = try? await pointLeg.getOfficialDirections()
+            }
+        }
     }
+    
 }
 
 /// A vertical timeline of a route: each waypoint at its start time,
@@ -51,8 +65,10 @@ struct Timeline: View {
             if let leg = route.leg(from: waypoint) {
                 legRow(leg)
                     .timelineRow()
+                    .deleteDisabled(true)
             }
         }
+        .onDelete(perform: route.deleteWaypoints)
     }
     
     private func waypointRow(_ waypoint: Waypoint) -> some View {
@@ -85,9 +101,21 @@ struct Timeline: View {
             }
             .frame(width: timeColumnWidth)
             
-            Text(travelSummary(of: leg))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Menu {
+                Picker("Transport", selection: transportType(of: leg)) {
+                    ForEach(TransportType.allCases, id: \.self) { type in
+                        Label(type.label.name, systemImage: type.label.icon)
+                    }
+                }
+            } label: {
+                HStack {
+                    Text(travelSummary(of: leg))
+                        .font(.caption)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 9))
+                }
+                .foregroundStyle(.blue)
+            }
         }
     }
     
@@ -96,7 +124,21 @@ struct Timeline: View {
             .fill(.gray.opacity(0.4))
             .frame(width: 2, height: 14)
     }
-    
+
+    /// A binding to `leg`'s transport type that fetches new directions when it changes,
+    /// unless the leg uses a recorded path.
+    private func transportType(of leg: PointLeg) -> Binding<TransportType> {
+        Binding(
+            get: { leg.transportType },
+            set: { newType in
+                guard newType != leg.transportType else { return }
+                leg.transportType = newType
+                guard !leg.useCustomRoute else { return }
+                Task { _ = try? await leg.getOfficialDirections() }
+            }
+        )
+    }
+
     /// The start time, such as `"9:05"`.
     private func startTime(of schedule: Schedule) -> String {
         String(format: "%d:%02d", schedule.startHour, schedule.startMinute)
@@ -112,7 +154,7 @@ struct Timeline: View {
             parts.append(Measurement(value: distance, unit: UnitLength.meters)
                 .formatted(.measurement(width: .abbreviated, usage: .road)))
         }
-        return parts.isEmpty ? leg.transportType.label : parts.joined(separator: " · ")
+        return (parts.isEmpty ? leg.transportType.label.name : parts.joined(separator: " · "))
     }
 }
 

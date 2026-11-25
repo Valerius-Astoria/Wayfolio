@@ -58,8 +58,10 @@ import SwiftData
     }
     
     var isChecked: Bool {
-        let conditions: [Checkable?] = [location, photo, question]
-        return conditions.compactMap { $0 }.allSatisfy{ $0.isChecked } || ismanualChecked
+        let conditions: [Checkable] = ([location, photo, question] as [Checkable?]).compactMap { $0 }
+        // With no conditions, `allSatisfy` would always be true, so only the user's own check counts.
+        guard !conditions.isEmpty else { return ismanualChecked }
+        return conditions.allSatisfy { $0.isChecked } || ismanualChecked
     }
 }
 

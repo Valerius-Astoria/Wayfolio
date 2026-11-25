@@ -22,15 +22,16 @@ enum AdventureType: Int, Codable, Comparable {
     /// The display name, icon, and color for this type.
     var label: IconLabel {
         switch self {
-        case .hiking:     IconLabel(icon: "figure.hiking",     color: .green)
-        case .cityWalk:   IconLabel(icon: "building.2.fill",   color: .orange)
-        case .festival:   IconLabel(icon: "party.popper.fill", color: .pink)
-        case .pilgrimage: IconLabel(icon: "book.pages.fill",   color: .indigo)
+        case .hiking:     IconLabel(name: "hiking", icon: "figure.hiking",     color: .green)
+        case .cityWalk:   IconLabel(name: "cityWalk", icon: "building.2.fill",   color: .orange)
+        case .festival:   IconLabel(name: "festival", icon: "party.popper.fill", color: .pink)
+        case .pilgrimage: IconLabel(name: "pilgrimage", icon: "book.pages.fill",   color: .indigo)
         }
     }
 }
 
 struct IconLabel: Hashable {
+    var name: String
     var icon: String
-    var color: Color
+    var color: Color = .accentColor
 }

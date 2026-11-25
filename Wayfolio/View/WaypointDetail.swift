@@ -8,7 +8,11 @@
 import SwiftUI
 
 struct WaypointDetail: View {
-    let waypoint: Waypoint
+    @State private var editMode: EditMode = .inactive
+    @State private var isEditingHours = false
+    
+    @Bindable var waypoint: Waypoint
+    private var isEditing: Bool { editMode.isEditing }
     
     var body: some View {
         HStack {
@@ -44,10 +48,20 @@ struct WaypointDetail: View {
             }
             .padding(.horizontal)
         }
+        .padding(.top, 8)
         List {
+            if isEditing {
+                Section("Schedule") {
+                    ScheduleEditor(schedule: $waypoint.schedule)
+                }
+            }
             if let intro  = waypoint.intro {
                 Section("Introduction") {
-                    Text(intro)
+                    if isEditing {
+                        TextField("Intro", text: $waypoint.intro.orEmpty, axis: .vertical)
+                    } else {
+                        Text(intro)
+                    }
                 }
             }
             if !waypoint.clues.isEmpty {
@@ -77,17 +91,25 @@ struct WaypointDetail: View {
                                             .font(.footnote)
                                             .foregroundStyle(.gray)
                                     }
-                                    
                                 }
                             } icon: {
                                 Image(systemName: clue.icon)
                             }
                         }
                     }
+                    .onDelete(perform: waypoint.deleteClues(at: ))
                 }
             }
             Section("Hours") {
-                if let hours = waypoint.hours {
+                if isEditing, waypoint.hours != nil {
+                    // A button, not a `NavigationLink`: a list in edit mode ignores taps on links.
+                    Button("Edit Hours") {
+                        isEditingHours = true
+                    }
+                    Button("Remove Hours", role: .destructive) {
+                        waypoint.hours = nil
+                    }
+                } else if let hours = waypoint.hours {
                     VStack {
                         ForEach(hours.grouped()) { group in
                             HStack(alignment: .firstTextBaseline) {
@@ -99,35 +121,66 @@ struct WaypointDetail: View {
                         }
                     }
                 } else {
-                    Button("Add Hour") {}
+                    Button("Add Hours") {
+                        waypoint.hours = Hours(open: .init(9), close: .init(17))
+                    }
                 }
             }
             Section("Details") {
                 HStack {
                     Text("Phone").padding(.trailing)
-                    Text(waypoint.phoneNumber ?? "Unknown")
-                        .foregroundStyle(.secondary)
+                    if isEditing {
+                        TextField("Intro", text: $waypoint.phoneNumber.orEmpty, axis: .vertical)
+                    } else {
+                        Text(waypoint.phoneNumber ?? "Unknown")
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 HStack {
                     Text("Website").padding(.trailing)
-                    Text(waypoint.url?.absoluteString ?? "Unknown")
-                        .foregroundStyle(.secondary)
+                    if isEditing {
+                        TextField("Website", text: Binding(
+                            get: { waypoint.url?.absoluteString ?? "" },
+                            set: { waypoint.url = $0.isEmpty ? nil : URL(string: $0) }
+                        ))
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    } else {
+                        Text(waypoint.url?.absoluteString ?? "Unknown")
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 HStack {
                     Text("Address").padding(.trailing)
-                    if (waypoint.fullAddress != nil) || waypoint.shortAddress != nil {
-                        Text(waypoint.fullAddress ?? "" + (waypoint.shortAddress ?? ""))
-                            .foregroundStyle(.secondary)
+                    if isEditing {
+                        TextField("Intro", text: $waypoint.fullAddress.orEmpty, axis: .vertical)
                     } else {
-                        Text("Unknown")
-                            .foregroundStyle(.secondary)
+                        if waypoint.fullAddress != nil {
+                            Text(waypoint.fullAddress ?? "")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("Unknown")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
         }
         .listStyle(.plain)
+        // Outside the list, because SwiftUI ignores a destination placed in a lazy container's row.
+        .navigationDestination(isPresented: $isEditingHours) {
+            if let hours = Binding($waypoint.hours) {
+                HoursEditor(hours: hours)
+                    .environment(\.editMode, .constant(.inactive))
+            }
+        }
         .navigationTitle(waypoint.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            EditButton()
+        }
+        .environment(\.editMode, $editMode)
     }
 }
 
