@@ -7,6 +7,7 @@
 
 import MapKit
 import SwiftData
+import SwiftUI
 
 /// A place to visit during an adventure.
 ///
@@ -91,15 +92,50 @@ import SwiftData
         self.route = route
     }
 
-    var isPOI: Bool { return poiIdentifier != nil }
+    var isPOI: Bool { poiIdentifier != nil }
+
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
     
     /// Whether the place is open right now.
     ///
     /// - Returns: `nil` if the opening hours are unknown. See `Hours.isOpen(at:)`.
-    var isOpening: Bool? { hours?.isOpen() }
+    var isOpenNow: Bool? { hours?.isOpen() }
     
+    /// The clues, sorted by `order`.
+    var orderedClues: [Clue] {
+        clues.sorted { $0.order < $1.order }
+    }
+
+    // MARK: - Editing
+
+    /// Adds a clue with no conditions after the existing ones.
+    func addClue(name: String, detail: String, icon: String) {
+        let clue = Clue(name: name, detail: detail, icon: icon, waypoint: self, order: clues.count)
+        // Creating it with this parent may already have linked it through the inverse relationship.
+        if !clues.contains(clue) {
+            clues.append(clue)
+        }
+    }
+
+    /// Moves clues in `orderedClues`, then renumbers them.
+    func moveClues(from source: IndexSet, to destination: Int) {
+        var ordered = orderedClues
+        ordered.move(fromOffsets: source, toOffset: destination)
+        for (index, clue) in ordered.enumerated() {
+            clue.order = index
+        }
+    }
+
+    /// Deletes the clues at `offsets` in `orderedClues`, then renumbers the rest.
     func deleteClues(at offsets: IndexSet) {
-        let doomed = offsets.map { clues[$0] }
+        let ordered = orderedClues
+        let doomed = Set(offsets.map { ordered[$0] })
+        clues = ordered.filter { !doomed.contains($0) }
+        for (index, clue) in clues.enumerated() {
+            clue.order = index
+        }
         for clue in doomed {
             modelContext?.delete(clue)
         }
@@ -148,6 +184,20 @@ import SwiftData
     func check() async throws {
         try await location?.check()
         isChecked = true
+    }
+
+    /// Whether every clue is checked, which Check In requires.
+    var areCluesChecked: Bool {
+        clues.allSatisfy(\.isChecked)
+    }
+
+    /// Unchecks the waypoint, its arrival condition, and all of its clues.
+    func resetProgress() {
+        isChecked = false
+        location?.isChecked = false
+        for clue in clues {
+            clue.resetProgress()
+        }
     }
 }
 

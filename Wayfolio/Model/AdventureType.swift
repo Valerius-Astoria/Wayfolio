@@ -12,7 +12,7 @@ import SwiftUI
 ///
 /// Stored in SwiftData by raw value, so don't reorder or remove existing cases once real data exists.
 /// Sorting follows the raw value.
-enum AdventureType: Int, Codable, Comparable {
+nonisolated enum AdventureType: Int, Comparable, Codable, CaseIterable {
     static func < (lhs: AdventureType, rhs: AdventureType) -> Bool {
         lhs.rawValue < rhs.rawValue
     }
@@ -22,15 +22,15 @@ enum AdventureType: Int, Codable, Comparable {
     /// The display name, icon, and color for this type.
     var label: IconLabel {
         switch self {
-        case .hiking:     IconLabel(name: "hiking", icon: "figure.hiking",     color: .green)
-        case .cityWalk:   IconLabel(name: "cityWalk", icon: "building.2.fill",   color: .orange)
-        case .festival:   IconLabel(name: "festival", icon: "party.popper.fill", color: .pink)
-        case .pilgrimage: IconLabel(name: "pilgrimage", icon: "book.pages.fill",   color: .indigo)
+        case .hiking:     IconLabel(name: "Hiking", icon: "figure.hiking",     color: .green)
+        case .cityWalk:   IconLabel(name: "City Walk", icon: "building.2.fill",   color: .orange)
+        case .festival:   IconLabel(name: "Festival", icon: "party.popper.fill", color: .pink)
+        case .pilgrimage: IconLabel(name: "Pilgrimage", icon: "book.pages.fill",   color: .indigo)
         }
     }
 }
 
-struct IconLabel: Hashable {
+nonisolated struct IconLabel: Hashable {
     var name: String
     var icon: String
     var color: Color = .accentColor

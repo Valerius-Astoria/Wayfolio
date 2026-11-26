@@ -9,7 +9,9 @@ import Foundation
 import SwiftData
 import SwiftUI
 
-/// An in-memory SwiftData store filled with sample adventures, for previews and development.
+/// An in-memory SwiftData store filled with sample adventures, for previews.
+///
+/// The app itself uses `ModelContainer.wayfolio()`, seeded once with the same sample.
 @MainActor
 class SampleData {
     static let shared = SampleData()
@@ -24,17 +26,10 @@ class SampleData {
 
     /// Creates the container and fills it with `Adventure.sampleData`. Crashes if the container can't be created.
     private init() {
-        let schema = Schema([
-            Adventure.self,
-            Clue.self,
-            PointLeg.self,
-            Route.self,
-            Waypoint.self
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let modelConfiguration = ModelConfiguration(schema: .wayfolio, isStoredInMemoryOnly: true)
 
         do {
-            modelContainer = try ModelContainer(for: schema, configurations: [modelConfiguration])
+            modelContainer = try ModelContainer(for: .wayfolio, configurations: [modelConfiguration])
             insertSampleData()
             try context.save()
         } catch {
@@ -101,32 +96,32 @@ extension Adventure {
         // MARK: Clues
         
         waypoint1.clues = [
-            Clue(clueName: "The Saucer", brief: "Order a pot of tea and look beneath the saucer.", detail: "\"Cross the water, but never in a straight line.\"", icon: "envelope", waypoint: waypoint1, order: 0),
-            Clue(clueName: "Upstairs Window", brief: "Find the window that faces the bridge.", detail: "From up here, count the bridge's turns before you leave.", icon: "binoculars", location: LocationCondition(latitude: 31.226675990334833, longitude: 121.49190609513421, radius: 50), waypoint: waypoint1, order: 1)
+            Clue(name: "The Saucer", brief: "Order a pot of tea and look beneath the saucer.", detail: "\"Cross the water, but never in a straight line.\"", icon: "envelope", waypoint: waypoint1, order: 0),
+            Clue(name: "Upstairs Window", brief: "Find the window that faces the bridge.", detail: "From up here, count the bridge's turns before you leave.", icon: "binoculars", location: LocationCondition(latitude: 31.226675990334833, longitude: 121.49190609513421, radius: 50), waypoint: waypoint1, order: 1)
         ]
         waypoint2.clues = [
-            Clue(clueName: "Count the Turns", brief: "Walk the bridge from end to end.", detail: "The number unlocks the lions' riddle.", icon: "number", question: QuestionCondition(question: "How many turns does the bridge make?", answer: "9", hint: "It's right there in the bridge's Chinese name, 九曲桥."), waypoint: waypoint2, order: 0),
-            Clue(clueName: "Count the Turns", brief: "Walk the bridge from end to end.", detail: "The number unlocks the lions' riddle.", icon: "number", photo: PhotoCondition(name: "Apple", reference: UIImage(named: "apple")!, threshold: 0.5), waypoint: waypoint2, order: 1),
-            Clue(clueName: "Master of the Bridge", brief: "Prove you've truly crossed the bridge.", detail: "Only those who walk every turn may enter the garden's heart.", icon: "star", location: LocationCondition(latitude: 31.226453, longitude: 121.491538, radius: 40), photo: UIImage(named: "apple").flatMap { PhotoCondition(name: "Apple", reference: $0) }, question: QuestionCondition(question: "What does the teahouse float on?", answer: "lake", hint: "Look down from the bridge."), waypoint: waypoint2, order: 2),
+            Clue(name: "Count the Turns", brief: "Walk the bridge from end to end.", detail: "The number unlocks the lions' riddle.", icon: "number", question: QuestionCondition(question: "How many turns does the bridge make?", answer: "9", hint: "It's right there in the bridge's Chinese name, 九曲桥."), waypoint: waypoint2, order: 0),
+            Clue(name: "Count the Turns", brief: "Walk the bridge from end to end.", detail: "The number unlocks the lions' riddle.", icon: "number", photo: PhotoCondition(name: "Apple", reference: UIImage(named: "apple")!, threshold: 0.5), waypoint: waypoint2, order: 1),
+            Clue(name: "Master of the Bridge", brief: "Prove you've truly crossed the bridge.", detail: "Only those who walk every turn may enter the garden's heart.", icon: "star", location: LocationCondition(latitude: 31.226453, longitude: 121.491538, radius: 40), photo: UIImage(named: "apple").flatMap { PhotoCondition(name: "Apple", reference: $0) }, question: QuestionCondition(question: "What does the teahouse float on?", answer: "lake", hint: "Look down from the bridge."), waypoint: waypoint2, order: 2),
         ]
         waypoint3.clues = [
-            Clue(clueName: "The Lions' Age", brief: "Read the plaque beside the lions.", detail: "Older than the garden, they have watched every visitor pass. Next, follow your stomach to the lake.", icon: "pawprint", question: QuestionCondition(question: "Which dynasty cast these lions?", answer: "Yuan", hint: "The dynasty founded by Kublai Khan."), waypoint: waypoint3, order: 0),
-            Clue(clueName: "At the Gate", brief: "Stand between the two lions.", detail: "One lion holds a ball, the other a cub. Together they guard the garden.", icon: "location", location: LocationCondition(latitude: 31.22741726801741, longitude: 121.49205510793958, radius: 30), waypoint: waypoint3, order: 1)
+            Clue(name: "The Lions' Age", brief: "Read the plaque beside the lions.", detail: "Older than the garden, they have watched every visitor pass. Next, follow your stomach to the lake.", icon: "pawprint", question: QuestionCondition(question: "Which dynasty cast these lions?", answer: "Yuan", hint: "The dynasty founded by Kublai Khan."), waypoint: waypoint3, order: 0),
+            Clue(name: "At the Gate", brief: "Stand between the two lions.", detail: "One lion holds a ball, the other a cub. Together they guard the garden.", icon: "location", location: LocationCondition(latitude: 31.22741726801741, longitude: 121.49205510793958, radius: 30), waypoint: waypoint3, order: 1)
         ]
         waypoint4.clues = [
-            Clue(clueName: "Eighteen Folds", brief: "Look closely before the first bite.", detail: "Tomorrow, the answer hides in the hall where spring is heralded.", icon: "fork.knife", question: QuestionCondition(question: "How many pleats does a perfect dumpling have?", answer: "18", hint: "Twice the number of turns on the bridge."), waypoint: waypoint4, order: 0)
+            Clue(name: "Eighteen Folds", brief: "Look closely before the first bite.", detail: "Tomorrow, the answer hides in the hall where spring is heralded.", icon: "fork.knife", question: QuestionCondition(question: "How many pleats does a perfect dumpling have?", answer: "18", hint: "Twice the number of turns on the bridge."), waypoint: waypoint4, order: 0)
         ]
         waypoint5.clues = [
-            Clue(clueName: "The Rebels' Hall", brief: "Step inside the hall.", detail: "\"The rebels hid their messages among the rocks. Find the one that breathes smoke.\"", icon: "scroll", location: LocationCondition(latitude: 31.227583553910062, longitude: 121.49233942208, radius: 40), waypoint: waypoint5, order: 0)
+            Clue(name: "The Rebels' Hall", brief: "Step inside the hall.", detail: "\"The rebels hid their messages among the rocks. Find the one that breathes smoke.\"", icon: "scroll", location: LocationCondition(latitude: 31.227583553910062, longitude: 121.49233942208, radius: 40), waypoint: waypoint5, order: 0)
         ]
         waypoint6.clues = [
-            Clue(clueName: "Seventy-Two Holes", brief: "Count them if you dare.", detail: "Every hole is a way out. Head south, where the city's guardians keep watch.", icon: "circle.grid.3x3", question: QuestionCondition(question: "How many holes does the rock have, by legend?", answer: "72", hint: "The same number as the Monkey King's transformations."), waypoint: waypoint6, order: 0)
+            Clue(name: "Seventy-Two Holes", brief: "Count them if you dare.", detail: "Every hole is a way out. Head south, where the city's guardians keep watch.", icon: "circle.grid.3x3", question: QuestionCondition(question: "How many holes does the rock have, by legend?", answer: "72", hint: "The same number as the Monkey King's transformations."), waypoint: waypoint6, order: 0)
         ]
         waypoint7.clues = [
-            Clue(clueName: "The Orb", brief: "A riddle from the Grail's keepers.", detail: "Now find one on the old street.", icon: "questionmark.circle", question: QuestionCondition(question: "You seek the orb that ought to be on Newton's tomb.", answer: "apple", hint: "Five letters. One fell on Newton's head."), waypoint: waypoint7, order: 0)
+            Clue(name: "The Orb", brief: "A riddle from the Grail's keepers.", detail: "Now find one on the old street.", icon: "questionmark.circle", question: QuestionCondition(question: "You seek the orb that ought to be on Newton's tomb.", answer: "apple", hint: "Five letters. One fell on Newton's head."), waypoint: waypoint7, order: 0)
         ]
         waypoint8.clues = [
-            Clue(clueName: "Find the Orb", brief: "Take a photo of an apple at a fruit stall.", detail: "The adventure is complete. The Grail was never far away.", icon: "camera", photo: UIImage(named: "apple").flatMap { PhotoCondition(name: "Apple", reference: $0) }, waypoint: waypoint8, order: 0)
+            Clue(name: "Find the Orb", brief: "Take a photo of an apple at a fruit stall.", detail: "The adventure is complete. The Grail was never far away.", icon: "camera", photo: UIImage(named: "apple").flatMap { PhotoCondition(name: "Apple", reference: $0) }, waypoint: waypoint8, order: 0)
         ]
 
         route1.waypoints = [waypoint1, waypoint2, waypoint3, waypoint4]

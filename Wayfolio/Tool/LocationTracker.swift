@@ -8,7 +8,7 @@
 import CoreLocation
 
 /// Provides the user's location as async sequences, built on `CLLocationUpdate.liveUpdates()`.
-struct LocationTracker {
+nonisolated struct LocationTracker {
     /// Streams filtered location updates until the consuming task is cancelled or the stream is no longer iterated.
     ///
     /// Requires iOS 18+ (`CLServiceSession`) and `NSLocationWhenInUseUsageDescription` in Info.plist.
@@ -93,7 +93,7 @@ struct LocationTracker {
 
 
 /// Errors thrown by `LocationTracker`.
-enum LocationError: LocalizedError {
+nonisolated enum LocationError: LocalizedError {
     case permissionDenied
     /// Location access is blocked by Screen Time or a device management profile.
     case restricted

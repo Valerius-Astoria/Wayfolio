@@ -8,7 +8,6 @@
 import SwiftUI
 import SwiftData
 import CoreLocation
-internal import System
 
 /// A multi-day trip, split into routes that each hold the waypoints to visit and the legs between them.
 @Model class Adventure {
@@ -16,7 +15,7 @@ internal import System
     var brief: String?
     var intro: String
     var region: String
-    var status: Status
+    var status: AdventureStatus
     
     var notes: [Note] = []
     /// The path the user actually walked, recorded by `track(maxAccuracy:minimumDistance:)`.
@@ -32,13 +31,16 @@ internal import System
     /// The routes that make up the adventure, usually one per day. Deleting the adventure deletes them too.
     @Relationship(deleteRule: .cascade, inverse: \Route.adventure)
     var routes: [Route] = []
+    /// The waypoint the user was last on while the adventure was running, where Resume returns to.
+    @Relationship(deleteRule: .nullify)
+    var currentWaypoint: Waypoint?
 
     init(name: String,
          brief: String?,
          intro: String,
          types: [AdventureType] = [],
          region: String,
-         status: Status = .notStarted,
+         status: AdventureStatus = .notStarted,
          tags: [String],
          image: Data) {
         self.name = name
@@ -56,11 +58,61 @@ internal import System
         routes.reduce(0) { $0 + $1.waypoints.count }
     }
 
+    /// The number of checked waypoints across all routes.
+    var checkedWaypointCount: Int {
+        routes.reduce(0) { $0 + $1.checkedWaypointCount }
+    }
+
     /// The number of days the adventure lasts, taken from the highest `day` among its routes.
     ///
     /// `0` if there are no routes.
     var dayCount: Int {
         routes.map(\.day).max() ?? 0
+    }
+    
+    /// The days that have at least one route, in order.
+    var days: [Int] {
+        Set(routes.map(\.day)).sorted()
+    }
+
+    /// The routes on `day`, sorted by `order`.
+    func routes(on day: Int) -> [Route] {
+        routes
+            .filter { $0.day == day }
+            .sorted { $0.order < $1.order }
+    }
+
+    // MARK: - Running
+
+    /// Every waypoint in the order they're visited: by day, then route, then stop.
+    var orderedWaypoints: [Waypoint] {
+        days.flatMap { routes(on: $0) }.flatMap(\.orderedWaypoints)
+    }
+
+    var firstWaypoint: Waypoint? {
+        orderedWaypoints.first
+    }
+
+    /// The stop after `waypoint`, continuing into the next route or day. `nil` after the last one.
+    func waypoint(after waypoint: Waypoint) -> Waypoint? {
+        let ordered = orderedWaypoints
+        guard let index = ordered.firstIndex(of: waypoint), index + 1 < ordered.count else { return nil }
+        return ordered[index + 1]
+    }
+
+    /// Where Resume takes the user: the last waypoint they were on, otherwise the first one not yet checked.
+    var resumeWaypoint: Waypoint? {
+        currentWaypoint ?? orderedWaypoints.first { !$0.isChecked } ?? firstWaypoint
+    }
+
+    /// Starts the adventure over: clears all progress and the recorded trace, and runs it from the first stop.
+    func restart() {
+        for waypoint in routes.flatMap(\.waypoints) {
+            waypoint.resetProgress()
+        }
+        trace = []
+        currentWaypoint = firstWaypoint
+        status = .started
     }
 
     /// Tracks the user's location during the adventure and appends each point to `trace`.
@@ -78,9 +130,44 @@ internal import System
             trace.append(RouteCoordinate(location.coordinate))
         }
     }
-    
+
+    // MARK: - Editing
+
+    func addNote(icon: String, body: String) {
+        notes.append(Note(icon: icon, body: body))
+    }
+
+    func moveNotes(from source: IndexSet, to destination: Int) {
+        notes.move(fromOffsets: source, toOffset: destination)
+    }
+
     func deleteNotes(at offsets: IndexSet) {
         notes.remove(atOffsets: offsets)
+    }
+
+    /// Adds a route at the end of `day`.
+    @discardableResult
+    func addRoute(name: String, day: Int, transportType: TransportType) -> Route {
+        let route = Route(name: name,
+                          brief: nil,
+                          intro: nil,
+                          on: day,
+                          order: routes(on: day).count,
+                          in: self,
+                          defaultTransportType: transportType)
+        // Creating it with this parent may already have linked it through the inverse relationship.
+        if !routes.contains(route) {
+            routes.append(route)
+        }
+        return route
+    }
+
+    /// Moves `dayRoutes` onto `day`, in the given order.
+    func arrange(_ dayRoutes: [Route], on day: Int) {
+        for (index, route) in dayRoutes.enumerated() {
+            route.day = day
+            route.order = index
+        }
     }
     
     /// Deletes `doomedRoutes`, along with their waypoints and legs.
@@ -126,7 +213,7 @@ internal import System
 }
 
 /// A short tip attached to an adventure.
-struct Note: Codable, Identifiable {
+nonisolated struct Note: Codable, Identifiable {
     var id: UUID = UUID()
 
     /// An SF Symbol name.
@@ -137,6 +224,14 @@ struct Note: Codable, Identifiable {
 /// The user's progress through an adventure.
 ///
 /// Stored in SwiftData by raw value, so renaming a case breaks existing data.
-enum Status: String, Codable {
-    case notStarted, stared, ended, abondened
+nonisolated enum AdventureStatus: String, Codable {
+    case notStarted
+    /// Running: the user is on the adventure now.
+    case started
+    /// Stopped for now. Resume continues from `Adventure.currentWaypoint`.
+    case paused
+    /// Finished, with every waypoint checked.
+    case checked
+    /// Stopped before every waypoint was checked.
+    case ended
 }

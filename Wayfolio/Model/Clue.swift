@@ -10,13 +10,14 @@ import SwiftData
 
 /// A clue hidden at a waypoint, which the user unlocks by meeting all of its conditions.
 ///
-/// A clue with no conditions is unlocked as soon as the user opens it.
+/// A clue with no conditions is checked by hand with its Check button.
 @Model class Clue {
     var name: String
     var brief: String?
     var detail: String
     var icon: String
-    var ismanualChecked: Bool
+    /// Whether the user checked a clue that has no conditions. Ignored once the clue has conditions.
+    var isManuallyChecked: Bool
     var order: Int
 
     var location: LocationCondition?
@@ -25,21 +26,21 @@ import SwiftData
 
     var waypoint: Waypoint
 
-    init(clueName: String,
+    init(name: String,
          brief: String? = nil,
          detail: String,
          icon: String = "folder",
-         ismanualChecked: Bool = false, // no condition
+         isManuallyChecked: Bool = false,
          location: LocationCondition? = nil,
          photo: PhotoCondition? = nil,
          question: QuestionCondition? = nil,
          waypoint: Waypoint,
          order: Int) {
-        self.name = clueName
+        self.name = name
         self.brief = brief
         self.detail = detail
         self.icon = icon
-        self.ismanualChecked = ismanualChecked
+        self.isManuallyChecked = isManuallyChecked
         self.location = location
         self.photo = photo
         self.question = question
@@ -57,11 +58,21 @@ import SwiftData
         .compactMap { $0 }
     }
     
+    /// Whether every condition is met, or, for a clue with no conditions, whether the user checked it.
     var isChecked: Bool {
         let conditions: [Checkable] = ([location, photo, question] as [Checkable?]).compactMap { $0 }
         // With no conditions, `allSatisfy` would always be true, so only the user's own check counts.
-        guard !conditions.isEmpty else { return ismanualChecked }
-        return conditions.allSatisfy { $0.isChecked } || ismanualChecked
+        guard !conditions.isEmpty else { return isManuallyChecked }
+        return conditions.allSatisfy(\.isChecked)
+    }
+
+    /// Unchecks the clue and each of its conditions, and forgets the last answer typed.
+    func resetProgress() {
+        isManuallyChecked = false
+        location?.isChecked = false
+        photo?.isChecked = false
+        question?.isChecked = false
+        question?.response = nil
     }
 }
 

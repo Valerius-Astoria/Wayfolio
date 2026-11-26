@@ -5,11 +5,12 @@
 //  Created by ZAKA on 11/24/26.
 //
 
+import Foundation
 
 /// When the user plans to visit a place.
 ///
 /// Times are stored as separate hour and minute values, because SwiftData can't store `DateComponents`.
-struct Schedule: Codable {
+nonisolated struct Schedule: Codable {
     var startHour: Int
     var startMinute: Int
     var endHour: Int
@@ -37,10 +38,8 @@ struct Schedule: Codable {
         endMinutes - startMinutes
     }
 
-    /// The time range formatted for display, such as `"9:05-10:30"`.
+    /// The time range formatted for display, such as `"9:05–10:30"`.
     func display() -> String {
-        let startMinuteString = startMinute < 10 ? "0\(startMinute)" : "\(startMinute)"
-        let endMinuteString = endMinute < 10 ? "0\(endMinute)" : "\(endMinute)"
-        return("\(startHour):\(startMinuteString)-\(endHour):\(endMinuteString)")
+        String(format: "%d:%02d–%d:%02d", startHour, startMinute, endHour, endMinute)
     }
 }

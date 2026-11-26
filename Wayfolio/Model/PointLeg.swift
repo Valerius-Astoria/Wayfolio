@@ -10,14 +10,17 @@ import SwiftData
 
 /// The journey between two consecutive waypoints.
 ///
-/// The path comes either from Apple Maps directions or from a path the user recorded
-/// with `buildCustomRoute()`.
+/// The path comes from a recording made with `buildCustomRoute()` if there is one,
+/// otherwise from Apple Maps directions. See `pathCoordinates`.
 @Model class PointLeg {
     var startingPoint: Waypoint
     var endPoint: Waypoint
     var transportType: TransportType
     
+    /// The path the user recorded with `buildCustomRoute()`.
     var customCoordinates: [RouteCoordinate] = []
+    /// The path of the Apple Maps directions, saved by `getOfficialDirections()`.
+    var directionCoordinates: [RouteCoordinate] = []
     var expectedTravelTime: Double?
     var distance: Double?
     var order: Int
@@ -36,14 +39,20 @@ import SwiftData
         self.route = route
     }
 
-    var useCustomRoute: Bool { !customCoordinates .isEmpty }
+    var useCustomRoute: Bool { !customCoordinates.isEmpty }
 
-    /// The recorded path as coordinates, ready for drawing a `MapPolyline`.
-    var customPolylineCoordinates: [CLLocationCoordinate2D] {
-        customCoordinates.map(\.coordinate)
+    /// Whether the leg still needs Apple Maps directions: it has neither a recording nor directions.
+    var needsDirections: Bool { !useCustomRoute && directionCoordinates.isEmpty }
+
+    /// The path to draw on the map: the recording, otherwise the directions,
+    /// otherwise a straight line until directions arrive.
+    var pathCoordinates: [CLLocationCoordinate2D] {
+        let path = useCustomRoute ? customCoordinates : directionCoordinates
+        guard !path.isEmpty else { return [startingPoint.coordinate, endPoint.coordinate] }
+        return path.map(\.coordinate)
     }
 
-    /// Requests directions from Apple Maps and saves the travel time and distance.
+    /// Requests directions from Apple Maps and saves the travel time, distance, and path.
     ///
     /// - Returns: The first route found, or `nil` if there is none.
     /// - Throws: An `MKError` if the directions request fails.
@@ -55,6 +64,7 @@ import SwiftData
         let route = try await MKDirections(request: request).calculate().routes.first
         self.expectedTravelTime = route?.expectedTravelTime
         self.distance = route?.distance
+        self.directionCoordinates = route?.polyline.coordinates.map(RouteCoordinate.init) ?? []
         return route
     }
 
@@ -89,7 +99,7 @@ import SwiftData
 }
 
 /// A `Codable` stand-in for `CLLocationCoordinate2D`, so coordinates can be stored with SwiftData.
-struct RouteCoordinate: Codable, Hashable {
+nonisolated struct RouteCoordinate: Codable, Hashable {
     let latitude: Double
     let longitude: Double
 
@@ -104,23 +114,23 @@ struct RouteCoordinate: Codable, Hashable {
 }
 
 /// How the user travels along a leg.
-enum TransportType: CaseIterable, Codable {
+nonisolated enum TransportType: CaseIterable, Codable {
     case walking, cycling, automobile, transit
 
-    /// An SF Symbol name for the transport type.
-    var systemImage: String {
+    /// The display name and icon, such as "Walk" and `figure.walk`.
+    var label: IconLabel {
         switch self {
         case .walking:
-            "figure.walk"
+            IconLabel(name: "Walk", icon: "figure.walk")
         case .cycling:
-            "figure.bicycle"
+            IconLabel(name: "Cycle", icon: "bicycle")
         case .automobile:
-            "figure.car"
+            IconLabel(name: "Drive", icon: "car.fill")
         case .transit:
-            "bus"
+            IconLabel(name: "Transit", icon: "bus.fill")
         }
     }
-
+    
     /// The matching transport type for an Apple Maps directions request.
     var directionsTransportType: MKDirectionsTransportType {
         switch self {
@@ -132,20 +142,6 @@ enum TransportType: CaseIterable, Codable {
             .automobile
         case .transit:
             .transit
-        }
-    }
-
-    /// A short display name, such as "walk".
-    var label: IconLabel {
-        switch self {
-        case .walking:
-            IconLabel(name: "walking", icon: "figure.walk")
-        case .cycling:
-            IconLabel(name: "ride", icon: "bicycle")
-        case .automobile:
-            IconLabel(name: "drive", icon: "car.fill")
-        case .transit:
-            IconLabel(name: "public", icon: "bus.fill")
         }
     }
 }

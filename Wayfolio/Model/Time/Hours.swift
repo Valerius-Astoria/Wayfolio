@@ -11,9 +11,9 @@ import Foundation
 ///
 /// Each day can have several periods, such as a morning and an evening with a break between them,
 /// and a period can run past midnight. A day with no periods is closed.
-struct Hours: Codable {
+nonisolated struct Hours: Codable {
     /// Raw values match `Calendar`'s `weekday` component (Sunday is `1`).
-    enum WeekDay: Int, Codable, CaseIterable {
+    nonisolated enum WeekDay: Int, Codable, CaseIterable {
         case Sun = 1, Mon, Tue, Wed, Thu, Fri, Sat
 
         /// The localized short name, such as "Mon".
@@ -32,7 +32,7 @@ struct Hours: Codable {
     /// A time of day.
     ///
     /// Stored as separate hour and minute values, because SwiftData can't store `DateComponents`.
-    struct Time: Codable, Hashable, Comparable {
+    nonisolated struct Time: Codable, Hashable, Comparable {
         /// From `0` to `23`.
         var hour: Int
         /// From `0` to `59`.
@@ -53,7 +53,7 @@ struct Hours: Codable {
     }
 
     /// A span of time on one day when the place is open.
-    struct Period: Codable, Hashable {
+    nonisolated struct Period: Codable, Hashable {
         let day: WeekDay
         var open: Time
         /// If this isn't after `open`, the period ends on the next day, so `open == close` means open 24 hours.
@@ -72,7 +72,7 @@ struct Hours: Codable {
     }
 
     /// Days that share the same opening times, for display.
-    struct Group: Identifiable {
+    nonisolated struct Group: Identifiable {
         /// In calendar order.
         let days: [WeekDay]
         /// The opening periods of the first day. The other days have the same times.

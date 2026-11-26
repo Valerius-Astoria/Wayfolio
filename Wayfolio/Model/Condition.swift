@@ -14,7 +14,7 @@ import MapKit
 // and each check only takes the input it needs.
 
 /// Met when the user is within `radius` meters of a coordinate.
-struct LocationCondition: Checkable, Codable, Hashable {
+nonisolated struct LocationCondition: Checkable, Codable, Hashable {
     var latitude: Double
     var longitude: Double
     var radius: Double
@@ -46,7 +46,7 @@ struct LocationCondition: Checkable, Codable, Hashable {
 }
 
 /// Met when the user's photo looks similar to a reference photo.
-struct PhotoCondition: Checkable, Codable, Hashable {
+nonisolated struct PhotoCondition: Checkable, Codable, Hashable {
     var name: String
     /// JPEG data.
     var reference: Data
@@ -102,7 +102,7 @@ struct PhotoCondition: Checkable, Codable, Hashable {
 }
 
 /// Met when the user types the answer to a question.
-struct QuestionCondition: Checkable, Codable, Hashable {
+nonisolated struct QuestionCondition: Checkable, Codable, Hashable {
     var question: String
     /// Case and surrounding whitespace are ignored when checking.
     var answer: String
@@ -110,7 +110,7 @@ struct QuestionCondition: Checkable, Codable, Hashable {
     var response: String?
     var isChecked = false
     var hint: String
-    var threshhold = 5
+    var threshold = 5
 
     static let label = IconLabel(name: "question", icon: "pencil.circle", color: .orange)
 
@@ -131,7 +131,7 @@ struct QuestionCondition: Checkable, Codable, Hashable {
 }
 
 /// Why a condition isn't met, in a form that can be shown to the user.
-struct ConditionFailure: LocalizedError {
+nonisolated struct ConditionFailure: LocalizedError {
     let message: String
 
     init(_ message: String) { self.message = message }
@@ -139,6 +139,6 @@ struct ConditionFailure: LocalizedError {
     var errorDescription: String? { message }
 }
 
-protocol Checkable {
+nonisolated protocol Checkable {
     var isChecked: Bool { get }
 }
