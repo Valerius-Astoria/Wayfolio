@@ -18,9 +18,12 @@ struct AdventureDetail: View {
     @State private var day: Int?
     /// The days whose routes are hidden under their "Day" subtitle.
     @State private var collapsedDays: Set<Int> = []
+    @State private var selectedTypes: [AdventureType] = []
     
     @Bindable var adventure: Adventure
     private var isEditing: Bool { editMode.isEditing }
+    
+    @FocusState private var isTextFieldFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -28,10 +31,61 @@ struct AdventureDetail: View {
                 .padding(.horizontal)
             
             List() {
+                if isEditing {
+                    Section() {
+                        HStack {
+                            Text("Title").padding(.trailing, 5)
+                            TextField("", text: $adventure.name)
+                                .foregroundStyle(.secondary)
+                                .focused($isTextFieldFocused)
+                        }
+                        HStack {
+                            Text("Subtitle").padding(.trailing, 5)
+                            TextField("Intro", text: $adventure.brief.orEmpty, axis: .vertical)
+                                .foregroundStyle(.secondary)
+                                .focused($isTextFieldFocused)
+                        }
+                        HStack {
+                            Text("Kind").padding(.trailing, 5)
+                            ForEach(AdventureType.allCases, id: \.self) { type in
+                                let isSelected = adventure.types.contains(type)
+                                
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        if isSelected {
+                                            selectedTypes.removeAll { $0 == type }
+                                            adventure.types.removeAll { $0 == type }
+                                        } else {
+                                            selectedTypes.append(type)
+                                            adventure.types.append(type)
+                                        }
+                                    }
+                                } label: {
+                                    Text(type.label.name)
+                                        .font(.footnote)
+                                        .fontWeight(isSelected ? .semibold : .regular)
+                                        .foregroundStyle(isSelected ? .white : type.label.color)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(
+                                            type.label.color.opacity(isSelected ? 0.85 : 0.2),
+                                            in: RoundedRectangle(cornerRadius: 10)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .onAppear {
+                                selectedTypes = adventure.types
+                            }
+                        }
+                        
+                    }
+                }
                 Section("Introduction") {
                     if isEditing {
                         TextField("Intro", text: $adventure.intro, axis: .vertical)
                             .lineLimit(1...)
+                            .focused($isTextFieldFocused)
                     } else {
                         ExpandableText(adventure.intro)
                     }
@@ -52,9 +106,13 @@ struct AdventureDetail: View {
                                 .listRowSeparator(.hidden)
                                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                                 .listRowBackground(Color.clear)
+                                .disabled(isEditing)
                             }
                             .onDelete { offsets in
                                 adventure.delete(offsets.map { dayRoutes[$0] })
+                            }
+                            if (isEditing) {
+                                AddRow()
                             }
                         }
                     }
@@ -84,6 +142,9 @@ struct AdventureDetail: View {
             }
         }
         .environment(\.editMode, $editMode)
+        .onTapGesture {
+                    isTextFieldFocused = false
+                }
     }
 
     /// The days that have at least one route, in order.
@@ -184,6 +245,16 @@ struct RouteRow: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.gray.opacity(0.2), lineWidth: 2)
         )
+    }
+}
+
+struct AddRow: View {
+    var body: some View {
+        Button {
+            
+        } label: {
+            Label("Add a route", systemImage: "plus.circle.fill")
+        }
     }
 }
 

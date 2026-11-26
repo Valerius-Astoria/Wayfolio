@@ -12,7 +12,7 @@ import SwiftUI
 ///
 /// Stored in SwiftData by raw value, so don't reorder or remove existing cases once real data exists.
 /// Sorting follows the raw value.
-enum AdventureType: Int, Codable, Comparable {
+enum AdventureType: Int, Codable, Comparable, CaseIterable {
     static func < (lhs: AdventureType, rhs: AdventureType) -> Bool {
         lhs.rawValue < rhs.rawValue
     }
