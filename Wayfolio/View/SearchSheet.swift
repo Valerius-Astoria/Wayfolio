@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import PhotosUI
 import SwiftData
 
 /// Lists all adventures and filters them as the user types. See `Adventure.search(query:in:)`.
@@ -36,24 +37,48 @@ struct AdventureRow: View {
     let imageWidth: CGFloat
     let imageHeight: CGFloat
     let font: Font
+    let isEditing: Bool
     
-    init(adventure: Adventure, imageWidth: CGFloat = 54, imageHeight: CGFloat = 72, font: Font) {
+    @State private var selectedPhoto: PhotosPickerItem?
+    
+    init(adventure: Adventure, imageWidth: CGFloat = 54, imageHeight: CGFloat = 72, font: Font, isEditing: Bool = false) {
         self.adventure = adventure
         self.imageWidth = imageWidth
         self.imageHeight = imageHeight
         self.font = font
+        self.isEditing = isEditing
     }
     
     var body: some View {
         HStack(alignment: .bottom) {
-            if let uiImage = UIImage(data: adventure.image) {
-                Image(uiImage: uiImage)
-                    .thumbnailStyle(width: imageWidth, height: imageHeight)
-            } else {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(.systemGray5))
-                    .frame(width: 53, height: 72)
+            PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                ZStack {
+                    if let uiImage = UIImage(data: adventure.image) {
+                        Image(uiImage: uiImage)
+                            .thumbnailStyle(width: imageWidth, height: imageHeight)
+                    } else {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(.systemGray5))
+                            .frame(width: imageWidth, height: imageHeight)
+                    }
+
+                    if isEditing {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 30))
+                            .foregroundStyle(.black.opacity(0.6), .white.opacity(0.4))
+                    }
+                }
             }
+            .buttonStyle(.plain)
+            .allowsHitTesting(isEditing)
+            .onChange(of: selectedPhoto) { _, newItem in
+                Task {
+                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
+                        adventure.image = data
+                    }
+                }
+            }
+            
             VStack(alignment: .leading) {
                 Text(adventure.name).font(.headline)
                 if let brief = adventure.brief {

@@ -14,6 +14,8 @@ import Foundation
     var brief: String?
     var intro: String?
     var day: Int
+    /// The route's position within its day. See `Adventure.routes(on:)`.
+    var order: Int = 0
     var defaultTransportType: TransportType
 
     var adventure: Adventure
@@ -27,12 +29,14 @@ import Foundation
          brief: String?,
          intro: String?,
          on day: Int,
+         order: Int = 0,
          in adventure: Adventure,
          defaultTransportType: TransportType = .walking) {
         self.name = name
         self.brief = brief
         self.intro = intro
         self.day = day
+        self.order = order
         self.adventure = adventure
         self.defaultTransportType = defaultTransportType
     }

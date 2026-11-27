@@ -27,7 +27,7 @@ struct AdventureDetail: View {
 
     var body: some View {
         VStack(alignment: .leading) {
-            AdventureRow(adventure: adventure, imageWidth: 84, imageHeight: 112, font: .footnote)
+            AdventureRow(adventure: adventure, imageWidth: 84, imageHeight: 112, font: .footnote, isEditing: isEditing)
                 .padding(.horizontal)
             
             List() {
@@ -92,28 +92,22 @@ struct AdventureDetail: View {
                     
                 }
                 Section {
-                    ForEach(visibleDays, id: \.self) { day in
-                        dayHeader(day)
-                        if !collapsedDays.contains(day) {
-                            let dayRoutes = routes(on: day)
-                            ForEach(dayRoutes) { route in
-                                Button {
-                                    selectedRoute = route
-                                } label: {
-                                    RouteRow(route: route)
-                                }
-                                .buttonStyle(.plain)
-                                .listRowSeparator(.hidden)
-                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                                .listRowBackground(Color.clear)
-                                .disabled(isEditing)
+                    let rows = routeListRows
+                    if isEditing {
+                        ForEach(rows) { row in
+                            routeRow(row)
+                        }
+                        .onDelete { offsets in
+                            let doomed = offsets.compactMap { offset -> Route? in
+                                guard rows.indices.contains(offset),
+                                      case .route(let route) = rows[offset] else { return nil }
+                                return route
                             }
-                            .onDelete { offsets in
-                                adventure.delete(offsets.map { dayRoutes[$0] })
-                            }
-                            if (isEditing) {
-                                AddRow()
-                            }
+                            adventure.delete(doomed)
+                        }
+                    } else {
+                        ForEach(rows) { row in
+                            routeRow(row)
                         }
                     }
                 } header: {
@@ -125,15 +119,36 @@ struct AdventureDetail: View {
                 }
                 
                 Section("Attention") {
-                    ForEach(adventure.notes) { note in
-                        Label(note.body, systemImage: note.icon)
-                            .font(.subheadline)
-                            .listRowBackground(Color.clear)
+                    ForEach($adventure.notes) { $note in
+                        HStack {
+                            IconMenu(selection: $note.icon, choices: Note.Symbol.allCases)
+                                .padding(.trailing, 5)
+                                .foregroundStyle(.blue)
+                                .disabled(!isEditing)
+
+                            if isEditing {
+                                TextField("", text: $note.body, axis: .vertical)
+                            } else {
+                                Text(note.body)
+                            }
+                            
+                        }
+                        .listRowBackground(Color.clear)
                     }
                     .onDelete(perform: adventure.deleteNotes(at:))
+                    if isEditing {
+                        Button {
+                            adventure.notes.append(Note(icon: Note.Symbol.others.rawValue, body: "New Attention"))
+                        } label: {
+                            AddRow("Add a note")
+                        }
+                        .deleteDisabled(true)
+                        .moveDisabled(true)
+                    }
                 }
             }
             .listStyle(.plain)
+            .scrollDismissesKeyboard(.interactively)
             .navigationDestination(item: $selectedRoute) { route in
                 RouteDetail(route: route)
             }
@@ -142,9 +157,6 @@ struct AdventureDetail: View {
             }
         }
         .environment(\.editMode, $editMode)
-        .onTapGesture {
-                    isTextFieldFocused = false
-                }
     }
 
     /// The days that have at least one route, in order.
@@ -157,11 +169,55 @@ struct AdventureDetail: View {
         day.map { [$0] } ?? days
     }
 
-    /// The routes on `day`, sorted by start time.
+    /// The routes on `day`, sorted by `order`.
     private func routes(on day: Int) -> [Route] {
-        adventure.routes
-            .filter { $0.day == day }
-            .sorted { $0.schedule.startMinutes < $1.schedule.startMinutes }
+        adventure.routes(on: day)
+    }
+
+    /// Headers, routes, and add rows for the Routes section, in list order.
+    private var routeListRows: [RouteListRow] {
+        visibleDays.flatMap { dayNumber -> [RouteListRow] in
+            var rows: [RouteListRow] = [.header(dayNumber)]
+            guard !collapsedDays.contains(dayNumber) else { return rows }
+            rows.append(contentsOf: routes(on: dayNumber).map(RouteListRow.route))
+            if isEditing {
+                rows.append(.add(dayNumber))
+            }
+            return rows
+        }
+    }
+
+    @ViewBuilder
+    private func routeRow(_ row: RouteListRow) -> some View {
+        switch row {
+        case .header(let dayNumber):
+            dayHeader(dayNumber)
+                .deleteDisabled(true)
+                .moveDisabled(true)
+        case .route(let route):
+            if isEditing {
+                RouteRow(route: route)
+                    .routeListRow()
+            } else {
+                Button {
+                    selectedRoute = route
+                } label: {
+                    RouteRow(route: route)
+                }
+                .buttonStyle(.plain)
+                .routeListRow()
+            }
+        case .add(let dayNumber):
+            Button {
+                withAnimation {
+                    adventure.addRoute(on: dayNumber)
+                }
+            } label: {
+                AddRow("Add a route")
+            }
+            .deleteDisabled(true)
+            .moveDisabled(true)
+        }
     }
 
     /// A "Day" subtitle that shows or hides the routes on `day`.
@@ -214,6 +270,29 @@ struct AdventureDetail: View {
     }
 }
 
+/// A row in the Routes section: a day subtitle, a route, or the add control for that day.
+private enum RouteListRow: Identifiable {
+    case header(Int)
+    case route(Route)
+    case add(Int)
+
+    var id: String {
+        switch self {
+        case .header(let day): "header-\(day)"
+        case .route(let route): "route-\(ObjectIdentifier(route))"
+        case .add(let day): "add-\(day)"
+        }
+    }
+}
+
+private extension View {
+    func routeListRow() -> some View {
+        listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+            .listRowBackground(Color.clear)
+    }
+}
+
 /// A card showing a route's name, time span, brief, and how many of its waypoints are checked.
 struct RouteRow: View {
     let route: Route
@@ -248,13 +327,40 @@ struct RouteRow: View {
     }
 }
 
+/// The label for a "+ Add …" row at the end of a list section in edit mode.
+/// Wrap it in a `Button` so the row isn't a button inside a button.
 struct AddRow: View {
+    var title: LocalizedStringKey
+
+    init(_ title: LocalizedStringKey) {
+        self.title = title
+    }
+
     var body: some View {
-        Button {
-            
+        Label(title, systemImage: "plus.circle.fill")
+            .listRowBackground(Color.clear)
+    }
+}
+
+/// A menu for picking a note icon, labeled with the current symbol.
+struct IconMenu: View {
+    @Binding var selection: String
+    let choices: [Note.Symbol]
+
+    var body: some View {
+        Menu {
+            Picker("Icon", selection: $selection) {
+                ForEach(choices) { choice in
+                    Label(choice.title, systemImage: choice.rawValue)
+                        .tag(choice.rawValue)
+                }
+            }
+            .pickerStyle(.inline)
         } label: {
-            Label("Add a route", systemImage: "plus.circle.fill")
+            Image(systemName: selection)
         }
+        .accessibilityLabel("Icon")
+        .accessibilityValue(Note.Symbol(rawValue: selection)?.title ?? selection)
     }
 }
 

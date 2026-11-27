@@ -82,6 +82,33 @@ internal import System
     func deleteNotes(at offsets: IndexSet) {
         notes.remove(atOffsets: offsets)
     }
+
+    /// The routes on `day`, sorted by `order`.
+    func routes(on day: Int) -> [Route] {
+        routes.filter { $0.day == day }
+            .sorted { $0.order < $1.order }
+    }
+
+    /// Adds an empty route at the end of `day`. No waypoints are created.
+    ///
+    /// Appends to `routes` so the list updates immediately. Linking only through
+    /// `Route`'s `adventure` inverse is not observed until SwiftData autosaves.
+    func addRoute(on day: Int) {
+        let existing = routes(on: day)
+        let route = Route(
+            name: "New Route",
+            brief: nil,
+            intro: nil,
+            on: day,
+            order: (existing.map(\.order).max() ?? -1) + 1,
+            in: self
+        )
+        if routes.contains(where: { $0 === route }) {
+            routes = Array(routes)
+        } else {
+            routes.append(route)
+        }
+    }
     
     /// Deletes `doomedRoutes`, along with their waypoints and legs.
     func delete(_ doomedRoutes: [Route]) {
@@ -129,9 +156,30 @@ internal import System
 struct Note: Codable, Identifiable {
     var id: UUID = UUID()
 
-    /// An SF Symbol name.
+    /// An SF Symbol name. See `Symbol`.
     var icon: String
     var body: String
+
+    /// The symbols offered when picking a note's icon, with the name shown in the menu.
+    enum Symbol: String, CaseIterable, Identifiable {
+        case weather = "sun.rain.fill"
+        case food = "fork.knife"
+        case money = "dollarsign.circle"
+        case travel = "bus.fill"
+        case others = "info.circle"
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .weather: "Weather"
+            case .food: "Food"
+            case .money: "Money"
+            case .travel: "Travel"
+            case .others: "Others"
+            }
+        }
+    }
 }
 
 /// The user's progress through an adventure.
