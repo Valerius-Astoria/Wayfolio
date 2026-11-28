@@ -8,6 +8,7 @@
 import SwiftUI
 import PhotosUI
 import SwiftData
+import MapKit
 
 /// Lists all adventures and filters them as the user types. See `Adventure.search(query:in:)`.
 struct SearchSheet: View {
@@ -15,6 +16,7 @@ struct SearchSheet: View {
     
     @State private var query = ""
     @Environment(MapModel.self) var mapModel
+    @Environment(\.modelContext) private var modelContext
     
     var body: some View {
         @Bindable var mapModel = mapModel
@@ -48,6 +50,19 @@ struct SearchSheet: View {
             .navigationDestination(for: Waypoint.self) { waypoint in
                 WaypointDetail(waypoint: waypoint)
             }
+            .navigationDestination(for: MKMapItem.self) { item in
+                POIDetailView(item: item)
+            }
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button {
+                        modelContext.insert(Adventure(name: "New Adventure", brief: nil, intro: ""))
+                        try? modelContext.save()
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
         }
     }
 }
@@ -74,7 +89,7 @@ struct AdventureRow: View {
         HStack(alignment: .bottom) {
             PhotosPicker(selection: $selectedPhoto, matching: .images) {
                 ZStack {
-                    if let uiImage = UIImage(data: adventure.image) {
+                    if let data = adventure.image, let uiImage = UIImage(data: data) {
                         Image(uiImage: uiImage)
                             .thumbnailStyle(width: imageWidth, height: imageHeight)
                     } else {
@@ -96,6 +111,7 @@ struct AdventureRow: View {
                 Task {
                     if let data = try? await newItem?.loadTransferable(type: Data.self) {
                         adventure.image = data
+                        try? adventure.modelContext?.save()
                     }
                 }
             }
@@ -104,6 +120,9 @@ struct AdventureRow: View {
                 Text(adventure.name).font(.headline)
                 if let brief = adventure.brief {
                     Text(brief).font(.subheadline).foregroundStyle(.secondary)
+                } else {
+                    Spacer()
+                        .frame(height: 40)
                 }
                 HStack {
                     Text("\(adventure.routes.count) routes · \(adventure.waypointCount) places · \(adventure.dayCount) days")
@@ -116,11 +135,11 @@ struct AdventureRow: View {
                 .font(font)
             }
         }
-        
     }
 }
-//
-//#Preview {
-//    SearchSheet()
-//        .modelContainer(SampleData.shared.modelContainer)
-//}
+
+#Preview {
+    SearchSheet()
+        .modelContainer(SampleData.shared.modelContainer)
+        .environment(MapModel())
+}

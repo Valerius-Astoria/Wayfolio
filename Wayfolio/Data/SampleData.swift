@@ -60,15 +60,13 @@ extension Adventure {
         let sample = Adventure(
             name: "达芬奇密码",
             brief: "An adventure we all like, an adventure we all admire.",
-            intro: "This is a really cool adventure that brings you back to the laet centry. During this adventure, you'll visit the village tha t only exists in your imagination, rivers as clear as crystle, and status so vivid that you doubt if they are real.",
+            intro: "This is a really cool adventure that brings you back to the late century. During this adventure, you'll visit the village that only exists in your imagination, rivers as clear as crystal, and statues so vivid that you doubt if they are real.",
             types: [.pilgrimage, .cityWalk],
-            region: "Shanghai",
-            tags: ["Sherlock Holmes", "Baker Street 221B"],
-            image: UIImage(imageLiteralResourceName: "davinci_code").jpegData(compressionQuality: 0.8)!,
+            image: UIImage(imageLiteralResourceName: "davinci_code").jpegData(compressionQuality: 0.8),
         )
         sample.notes = [
             Note(icon: "bus", body: "Remember to take buses as you can, taxies are expensive"),
-            Note(icon: "umbrella", body: "Always bring an unbrella with you, it rains a lot")
+            Note(icon: "umbrella", body: "Always bring an umbrella with you, it rains a lot")
         ]
         let route1 = Route(name: "豫园漫步", brief: "A morning stroll through Yu Garden.", intro: "Start at the heart of the lake and wander north through the garden's pavilions. There will be lakes, rocks, moise that truly attract you, making you want to write a poem for it.", on: 1, in: sample)
         let route2 = Route(name: "点春堂寻踪", brief: "A quiet visit to the Hall of Heralding Spring.", intro: "Return to the garden on the second day to explore the hall at your own pace, then follow the trail south to the City God Temple and the old street.", on: 2, in: sample)
@@ -155,7 +153,7 @@ extension Adventure {
     }
 
     /// Adventures for previews, inserted by `SampleData`.
-    static var sampleData: [Adventure] = [
-        createSampleAdventure()
-    ]
+    static var sampleData: [Adventure] {
+        [createSampleAdventure()]
+    }
 }

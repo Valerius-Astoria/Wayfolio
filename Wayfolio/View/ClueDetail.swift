@@ -541,13 +541,6 @@ struct ClueDetail: View {
     }
 }
 
-
-//#Preview("Question") {
-//    NavigationStack {
-//        ClueDetail(clue: Adventure.sampleData.first!.routes.first!.orderedWaypoints[1].clues.first { $0.order == 0 }!)
-//    }
-//}
-
 #Preview("Photo") {
     NavigationStack {
         ClueDetail(clue: Adventure.sampleData.first!.routes.first!.orderedWaypoints[1].clues.first { $0.order == 0 }!)

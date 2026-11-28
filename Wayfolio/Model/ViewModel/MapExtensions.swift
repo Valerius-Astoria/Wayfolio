@@ -1,5 +1,5 @@
 //
-//  MapExtenions.swift
+//  MapExtensions.swift
 //  Wayfolio
 //
 //  Created by ZAKA on 11/27/26.

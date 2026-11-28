@@ -7,53 +7,53 @@
 
 import SwiftUI
 import SwiftData
+import MapKit
 
 /// A route's detail page: its introduction and a timeline of its waypoints.
 struct RouteDetail: View {
-    /// Owned here rather than read from the environment, because this view is the one that sets it.
-    @State private var editMode: EditMode = .inactive
     @Environment(MapModel.self) var mapModel
-    @FocusState private var isTextFieldFocused: Bool
+    @State private var placeQuery = ""
+    @State private var isPlaceSearchPresented = false
     
     @Bindable var route: Route
     
-    private var isEditing: Bool { editMode.isEditing }
+    private var isEditing: Bool { mapModel.isEditingRoute }
     
     var body: some View {
-        List {
+        @Bindable var mapModel = mapModel
+        Group {
             if isEditing {
-                HStack {
-                    Text("Title").padding(.trailing, 5)
-                    TextField(route.name, text: $route.name)
-                        .foregroundStyle(.secondary)
-                        .focused($isTextFieldFocused)
+                Group {
+                    RouteDetailList(route: route, placeQuery: $placeQuery, isPlaceSearchPresented: $isPlaceSearchPresented)
                 }
-                HStack {
-                    Text("Subtitle").padding(.trailing, 5)
-                    TextField("Intro", text: $route.brief.orEmpty, axis: .vertical)
-                        .foregroundStyle(.secondary)
-                        .focused($isTextFieldFocused)
-                }
-            }
-            if isEditing || route.intro != nil {
-                Section("Introduction") {
-                    TextField("Intro", text: $route.intro.orEmpty, axis: .vertical)
-                }
-            }
-            Section("Schedule") {
-                Timeline(route: route)
+                .searchable(text: $placeQuery, isPresented: $isPlaceSearchPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search places")
+            } else {
+                RouteDetailList(route: route, placeQuery: $placeQuery, isPlaceSearchPresented: $isPlaceSearchPresented)
             }
         }
         .navigationTitle(route.name)
         .navigationBarTitleDisplayMode(.inline)
-        .listStyle(.plain)
-        .environment(\.defaultMinListRowHeight, 0)
         .toolbar {
             EditButton()
         }
-        .environment(\.editMode, $editMode)
-        .onChange(of: waypointGraphID, initial: true) {
-            route.rebuildLegs()
+        .environment(\.editMode, $mapModel.routeEditMode)
+        .onChange(of: placeQuery) { _, query in
+            guard isEditing else { return }
+            mapModel.searchPlaces(query)
+        }
+        .onChange(of: isEditing) { _, editing in
+            if !editing {
+                placeQuery = ""
+                isPlaceSearchPresented = false
+                mapModel.searchPlaces("")
+                mapModel.highlightedPlace = nil
+            }
+        }
+        .onChange(of: mapModel.selectedPOI != nil) { _, showingPOI in
+            guard showingPOI else { return }
+            placeQuery = ""
+            isPlaceSearchPresented = false
+            mapModel.searchPlaces("")
         }
         .task(id: waypointGraphID) {
             route.rebuildLegs()
@@ -69,6 +69,80 @@ struct RouteDetail: View {
         route.orderedWaypoints
             .map { "\($0.persistentModelID):\($0.order):\($0.latitude):\($0.longitude)" }
             .joined(separator: "|")
+    }
+}
+
+/// The route's list. Hides title fields while the place-search field is active.
+private struct RouteDetailList: View {
+    @Bindable var route: Route
+    @Binding var placeQuery: String
+    @Binding var isPlaceSearchPresented: Bool
+
+    @Environment(MapModel.self) private var mapModel
+    @FocusState private var isTextFieldFocused: Bool
+
+    private var isEditing: Bool { mapModel.isEditingRoute }
+
+    var body: some View {
+        List {
+            if isEditing, !isPlaceSearchPresented {
+                HStack {
+                    Text("Title").padding(.trailing, 5)
+                    TextField(route.name, text: $route.name)
+                        .foregroundStyle(.secondary)
+                        .focused($isTextFieldFocused)
+                }
+                HStack {
+                    Text("Subtitle").padding(.trailing, 5)
+                    TextField("Intro", text: $route.brief.orEmpty, axis: .vertical)
+                        .foregroundStyle(.secondary)
+                        .focused($isTextFieldFocused)
+                }
+            }
+            if !isPlaceSearchPresented, isEditing || route.intro != nil {
+                Section("Introduction") {
+                    TextField("Intro", text: $route.intro.orEmpty, axis: .vertical)
+                }
+            }
+            if isEditing, !mapModel.placeCompletions.isEmpty {
+                Section("Places") {
+                    ForEach(mapModel.placeCompletions, id: \.self) { completion in
+                        Button {
+                            Task {
+                                await mapModel.selectPlace(completion)
+                                placeQuery = ""
+                                isPlaceSearchPresented = false
+                                mapModel.searchPlaces("")
+                            }
+                        } label: {
+                            VStack(alignment: .leading) {
+                                Text(completion.title)
+                                if !completion.subtitle.isEmpty {
+                                    Text(completion.subtitle)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Section("Schedule") {
+                if route.orderedWaypoints.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("No places yet")
+                        Text("Select a place on the map, or search for one in the editor, to add it to this route.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .listRowBackground(Color.clear)
+                } else {
+                    Timeline(route: route)
+                }
+            }
+        }
+        .listStyle(.plain)
+        .environment(\.defaultMinListRowHeight, 0)
     }
 }
 
@@ -88,7 +162,7 @@ struct Timeline: View {
     private let timeColumnWidth: CGFloat = 44
     
     var body: some View {
-        ForEach(route.orderedWaypoints, id: \.self) { waypoint in
+        ForEach(route.orderedWaypoints, id: \.persistentModelID) { waypoint in
             waypointLine(waypoint)
                 .timelineRow()
             

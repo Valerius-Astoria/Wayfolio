@@ -11,16 +11,43 @@ import SwiftData
 /// The app's entry point.
 @main
 struct WayfolioApp: App {
+    let modelContainer: ModelContainer
+
+    init() {
+        let schema = Schema([
+            Adventure.self,
+            Clue.self,
+            PointLeg.self,
+            Route.self,
+            Waypoint.self
+        ])
+        let storeURL = URL.applicationSupportDirectory.appending(path: "Wayfolio.store")
+        let configuration = ModelConfiguration(schema: schema, url: storeURL)
+
+        do {
+            modelContainer = try ModelContainer(for: schema, configurations: [configuration])
+        } catch {
+            // If a schema change cannot load the existing store, delete
+            // Application Support/Wayfolio.store (and -wal/-shm) locally, then relaunch.
+            fatalError("Could not create ModelContainer: \(error)")
+        }
+        Self.seedIfEmpty(modelContainer.mainContext)
+    }
+
     var body: some Scene {
         WindowGroup {
-//             Temporary: shows the sample adventure while the adventure view is being built.
-//            SearchSheet()
-//                .modelContainer(SampleData.shared.modelContainer)
-//            NavigationStack {
-//                ClueDetail(clue: Adventure.sampleData.first!.routes.first!.orderedWaypoints[1].clues.first { $0.order == 2 }!)
-//            }
             MapView(mapModel: MapModel())
-                .modelContainer(SampleData.shared.modelContainer)
         }
+        .modelContainer(modelContainer)
+    }
+
+    /// Inserts the sample adventure the first time the on-disk store is empty.
+    private static func seedIfEmpty(_ context: ModelContext) {
+        let count = (try? context.fetchCount(FetchDescriptor<Adventure>())) ?? 0
+        guard count == 0 else { return }
+        for adventure in Adventure.sampleData {
+            context.insert(adventure)
+        }
+        try? context.save()
     }
 }

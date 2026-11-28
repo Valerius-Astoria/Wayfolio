@@ -8,6 +8,7 @@
 import CoreLocation
 import SwiftData
 import Foundation
+import MapKit
 
 /// One part of an adventure, usually a day: the waypoints to visit in order and the legs between them.
 @Model class Route {
@@ -58,12 +59,6 @@ import Foundation
         pointLegs
             .sorted { $0.order < $1.order }
     }
-    
-    
-    // The number of checked waypoints.
-    var checkedWaypointCount: Int {
-        waypoints.count { $0.isChecked }
-    }
 
     /// The time span of the route, from the first waypoint's start to the last waypoint's end.
     ///
@@ -84,13 +79,47 @@ import Foundation
     
     // MARK: - Editing
 
+    /// Whether this route already includes the Apple Maps place.
+    func contains(_ item: MKMapItem) -> Bool {
+        guard let id = item.identifier?.rawValue else { return false }
+        return waypoints.contains { $0.poiIdentifier == id }
+    }
+
+    /// Appends a stop from an Apple Maps place, starting 15 minutes after this route's last waypoint and lasting 30 minutes.
+    func addWaypoint(from item: MKMapItem) {
+        let waypoint = Waypoint(
+            item: item,
+            name: nil,
+            intro: nil,
+            schedule: Schedule(following: orderedWaypoints.last?.schedule),
+            order: (waypoints.map(\.order).max() ?? -1) + 1,
+            route: self
+        )
+        if waypoints.contains(where: { $0 === waypoint }) {
+            waypoints = Array(waypoints)
+        } else {
+            waypoints.append(waypoint)
+        }
+        rebuildLegs()
+        try? modelContext?.save()
+    }
+
+    /// Removes the stop that matches the Apple Maps place, if it is on this route.
+    func removeWaypoint(matching item: MKMapItem) {
+        guard let id = item.identifier?.rawValue,
+              let index = orderedWaypoints.firstIndex(where: { $0.poiIdentifier == id }) else { return }
+        deleteWaypoints(at: IndexSet(integer: index))
+    }
+
     /// Deletes the waypoints at `offsets` in `orderedWaypoints`, then renumbers the rest and reconnects them.
     ///
     /// Legs to or from a deleted waypoint are deleted too. See `rebuildLegs()`.
     func deleteWaypoints(at offsets: IndexSet) {
         let ordered = orderedWaypoints
-        let doomedWaypoints = Set(offsets.map { ordered[$0] })
-        let remaining = ordered.filter { !doomedWaypoints.contains($0) }
+        let doomedWaypoints = offsets.map { ordered[$0] }
+        let remaining = ordered.filter { waypoint in
+            doomedWaypoints.allSatisfy { $0 !== waypoint }
+        }
 
         for (index, waypoint) in remaining.enumerated() {
             waypoint.order = index
@@ -101,6 +130,7 @@ import Foundation
         for waypoint in doomedWaypoints {
             modelContext?.delete(waypoint)
         }
+        try? modelContext?.save()
     }
 
     /// Moves waypoints in `orderedWaypoints`, then reconnects the legs. See `rebuildLegs()`.
@@ -117,6 +147,7 @@ import Foundation
         }
         waypoints = ordered
         rebuildLegs()
+        try? modelContext?.save()
     }
 
     /// Makes `pointLegs` connect each waypoint to the next one in `orderedWaypoints`.

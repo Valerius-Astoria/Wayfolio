@@ -13,13 +13,41 @@ import SwiftData
 @Observable
 class MapModel: NSObject, MKLocalSearchCompleterDelegate {
     // MARK: - Map state
-    var cameraPosition: MapCameraPosition = .userLocation(fallback: .region(.beijing)) // 使用当前用户定位为地图地址，如果用户未授权，则定位至北京
+    /// Follows the user; falls back to Beijing if location is unavailable.
+    var cameraPosition: MapCameraPosition = .userLocation(fallback: .region(.beijing))
     var selectedAdventure: Adventure?
     var selectedRoute: Route?
     var selectedWaypoint: Waypoint?
+    /// The Apple Maps place currently shown in the sheet, if any.
+    var selectedPOI: MKMapItem?
     /// Paths to draw for the current selection, grouped by route so each can use its own color.
     var drawnRoutes: [DrawnRoute] = []
     var navigationPath = NavigationPath() // Tracks the sheet's navigation stack
+    /// Height of the search sheet over the map.
+    var sheetDetent: PresentationDetent = .medium
+    /// `RouteDetail`'s edit mode. Stays on while a POI is pushed so that page can add a waypoint.
+    var routeEditMode: EditMode = .inactive
+    var isEditingRoute: Bool {
+        get { routeEditMode.isEditing }
+        set { routeEditMode = newValue ? .active : .inactive }
+    }
+    /// Skips camera updates when the path is rewritten while a POI page is on screen.
+    private var ignoreNextPop = false
+
+    /// The map area currently on screen, used to rank place-search results.
+    var visibleRegion: MKCoordinateRegion = .beijing
+    /// Autocomplete suggestions for the route editor's place search.
+    var placeCompletions: [MKLocalSearchCompletion] = []
+    /// The place picked from search, shown as a highlighted marker on the map.
+    var highlightedPlace: MKMapItem?
+    @ObservationIgnored
+    private let searchCompleter = MKLocalSearchCompleter()
+
+    override init() {
+        super.init()
+        searchCompleter.delegate = self
+        searchCompleter.resultTypes = [.pointOfInterest, .address]
+    }
 
     /// Distinct colors for routes in an adventure. At most 10 routes are shown.
     static let routeColors: [Color] = [
@@ -56,6 +84,7 @@ class MapModel: NSObject, MKLocalSearchCompleterDelegate {
         selectedAdventure = adventure
         selectedRoute = nil
         selectedWaypoint = nil
+        isEditingRoute = false
         
         guard let rect = Self.fittingRect(for: adventure.coordinates) else { return }
         withAnimation(.easeInOut(duration: 1.5)) {
@@ -82,14 +111,51 @@ class MapModel: NSObject, MKLocalSearchCompleterDelegate {
 
     /// Frames the map on `waypoint`.
     func focusCamera(on waypoint: Waypoint) {
-        guard let rect = Self.fittingRect(for: [waypoint.coordinate], minSideLength: 100) else { return }
+        focusCamera(on: waypoint.coordinate)
+    }
+
+    /// Frames the map on an Apple Maps place.
+    func focusCamera(on item: MKMapItem) {
+        focusCamera(on: item.location.coordinate)
+    }
+
+    /// Frames the map on `coordinate`.
+    func focusCamera(on coordinate: CLLocationCoordinate2D) {
+        guard let rect = Self.fittingRect(for: [coordinate], minSideLength: 150) else { return }
         withAnimation(.easeInOut(duration: 1.5)) {
             cameraPosition = .rect(rect)
         }
     }
 
+    /// Updates place autocomplete, preferring results near the current camera.
+    func searchPlaces(_ query: String) {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            placeCompletions = []
+            searchCompleter.queryFragment = ""
+            return
+        }
+        searchCompleter.region = visibleRegion
+        searchCompleter.queryFragment = trimmed
+    }
+
+    /// Resolves a completion, highlights it, moves the camera, collapses the sheet, and opens `POIDetailView`.
+    func selectPlace(_ completion: MKLocalSearchCompletion) async {
+        let request = MKLocalSearch.Request(completion: completion)
+        request.region = visibleRegion
+        guard let item = try? await MKLocalSearch(request: request).start().mapItems.first else { return }
+        highlightedPlace = item
+        focusCamera(on: item)
+        sheetDetent = .medium
+        revealInSheet(item)
+    }
+
     /// Replaces the sheet stack with adventure → route → waypoint so a map pin can open the matching pages.
     func revealInSheet(_ waypoint: Waypoint) {
+        if selectedPOI != nil {
+            ignoreNextPop = true
+            selectedPOI = nil
+        }
         selectedAdventure = waypoint.route.adventure
         selectedRoute = waypoint.route
         selectedWaypoint = waypoint
@@ -100,9 +166,31 @@ class MapModel: NSObject, MKLocalSearchCompleterDelegate {
         navigationPath = path
     }
 
+    /// Pushes the place onto the current sheet stack so Back returns to the page underneath.
+    func revealInSheet(_ item: MKMapItem) {
+        if let currentID = selectedPOI?.identifier?.rawValue,
+           currentID == item.identifier?.rawValue {
+            return
+        }
+        if selectedPOI != nil {
+            ignoreNextPop = true
+            navigationPath.removeLast()
+        }
+        selectedPOI = item
+        navigationPath.append(item)
+    }
+
     /// After a back navigation, frames the map on the page that's now on top.
     func handleNavigationPop(from oldCount: Int, to newCount: Int) {
         guard newCount < oldCount else { return }
+        if ignoreNextPop {
+            ignoreNextPop = false
+            return
+        }
+        if selectedPOI != nil {
+            selectedPOI = nil
+            return
+        }
         switch newCount {
         case 2:
             if let selectedRoute { select(selectedRoute) }
@@ -112,6 +200,7 @@ class MapModel: NSObject, MKLocalSearchCompleterDelegate {
             selectedAdventure = nil
             selectedRoute = nil
             selectedWaypoint = nil
+            isEditingRoute = false
         }
     }
 
@@ -156,7 +245,7 @@ class MapModel: NSObject, MKLocalSearchCompleterDelegate {
     
     // MARK: - Camera helper
 
-    /// 根据给定坐标列表，计算包含全部坐标的地图矩形。
+    /// A map rectangle that contains every coordinate, padded so a single point isn't zoomed in too tightly.
     private static func fittingRect(for coordinates: [CLLocationCoordinate2D], minSideLength: Double = 1000) -> MKMapRect? {
         guard !coordinates.isEmpty else { return nil }
 
@@ -165,7 +254,6 @@ class MapModel: NSObject, MKLocalSearchCompleterDelegate {
             return partial.union(MKMapRect(origin: point, size: MKMapSize(width: 0, height: 0)))
         }
 
-        // 最小边长约 1.5 公里，避免只有一个节点时放得太大
         let centerLatitude = MKMapPoint(x: rect.midX, y: rect.midY).coordinate.latitude
         let minSide = MKMapPointsPerMeterAtLatitude(centerLatitude) * minSideLength
 
@@ -176,6 +264,18 @@ class MapModel: NSObject, MKLocalSearchCompleterDelegate {
                          y: rect.midY - height / 2,
                          width: width,
                          height: height)
+    }
+}
+
+// MARK: - MKLocalSearchCompleterDelegate
+
+extension MapModel {
+    func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+        placeCompletions = completer.results
+    }
+
+    func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
+        placeCompletions = []
     }
 }
 

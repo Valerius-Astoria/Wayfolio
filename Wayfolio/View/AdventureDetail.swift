@@ -17,7 +17,6 @@ struct AdventureDetail: View {
     @State private var day: Int?
     /// The days whose routes are hidden under their "Day" subtitle.
     @State private var collapsedDays: Set<Int> = []
-    @State private var selectedTypes: [AdventureType] = []
     
     @Bindable var adventure: Adventure
     @Environment(MapModel.self) var mapModel
@@ -53,10 +52,8 @@ struct AdventureDetail: View {
                                 Button {
                                     withAnimation(.easeInOut(duration: 0.2)) {
                                         if isSelected {
-                                            selectedTypes.removeAll { $0 == type }
                                             adventure.types.removeAll { $0 == type }
                                         } else {
-                                            selectedTypes.append(type)
                                             adventure.types.append(type)
                                         }
                                     }
@@ -73,9 +70,6 @@ struct AdventureDetail: View {
                                         )
                                 }
                                 .buttonStyle(.plain)
-                            }
-                            .onAppear {
-                                selectedTypes = adventure.types
                             }
                         }
                         
@@ -139,6 +133,7 @@ struct AdventureDetail: View {
                     if isEditing {
                         Button {
                             adventure.notes.append(Note(icon: Note.Symbol.others.rawValue, body: "New Attention"))
+                            try? adventure.modelContext?.save()
                         } label: {
                             AddRow("Add a note")
                         }
@@ -162,8 +157,12 @@ struct AdventureDetail: View {
     }
 
     /// The day picked in `dayPicker`, or every day with routes if it's All Days.
+    ///
+    /// In edit mode with no routes yet, day 1 is shown so the add-route row can appear.
     private var visibleDays: [Int] {
-        day.map { [$0] } ?? days
+        if let day { return [day] }
+        if days.isEmpty, isEditing { return [1] }
+        return days
     }
 
     /// The routes on `day`, sorted by `order`.
@@ -361,9 +360,10 @@ struct IconMenu<Choice: IconPickable>: View {
         .accessibilityValue(choices.first { $0.iconName == selection }?.title ?? selection)
     }
 }
-//
-//#Preview {
-//    NavigationStack {
-//        AdventureDetail(adventure: Adventure.createSampleAdventure(), mapModel: <#MapModel#>)
-//    }
-//}
+
+#Preview {
+    NavigationStack {
+        AdventureDetail(adventure: Adventure.createSampleAdventure())
+    }
+    .environment(MapModel())
+}

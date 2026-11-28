@@ -8,14 +8,12 @@
 import SwiftUI
 import SwiftData
 import CoreLocation
-internal import System
 
 /// A multi-day trip, split into routes that each hold the waypoints to visit and the legs between them.
 @Model class Adventure {
     var name: String
     var brief: String?
     var intro: String
-    var region: String
     var status: Status
     
     var notes: [Note] = []
@@ -23,12 +21,10 @@ internal import System
     var trace: [RouteCoordinate] = []
     /// The categories the adventure belongs to, shown as icons. See `AdventureType.label`.
     var types: [AdventureType] = []
-    /// Free-form keywords used by `search(query:in:)`, such as the book or movie it's based on.
-    var tags: [String] = []
 
     /// The cover image, as JPEG data. Stored outside the database because it can be large.
     @Attribute(.externalStorage)
-    var image: Data
+    var image: Data?
     /// The routes that make up the adventure, usually one per day. Deleting the adventure deletes them too.
     @Relationship(deleteRule: .cascade, inverse: \Route.adventure)
     var routes: [Route] = []
@@ -37,28 +33,19 @@ internal import System
          brief: String?,
          intro: String,
          types: [AdventureType] = [],
-         region: String,
          status: Status = .notStarted,
-         tags: [String],
-         image: Data) {
+         image: Data? = nil) {
         self.name = name
         self.brief = brief
         self.intro = intro
         self.status = status
         self.types = types
-        self.region = region
-        self.tags = tags
         self.image = image
     }
     
     /// Every waypoint's location across all routes, for framing the map.
     var coordinates: [CLLocationCoordinate2D] {
         routes.flatMap(\.orderedWaypoints).map(\.coordinate)
-    }
-
-    /// Every leg across all routes, in day, route, and visit order.
-    var orderedPointLegs: [PointLeg] {
-        orderedRoutes.flatMap(\.orderedPointlegs)
     }
 
     /// Every waypoint across all routes, in day, route, and visit order.
@@ -86,6 +73,9 @@ internal import System
         routes.map(\.day).max() ?? 0
     }
 
+    // MARK: Custom map items
+    // Trace-recording UI is forthcoming. `trace` already persists with the adventure.
+
     /// Tracks the user's location during the adventure and appends each point to `trace`.
     ///
     /// Runs until the surrounding `Task` is cancelled. Existing `trace` points are kept,
@@ -104,6 +94,7 @@ internal import System
     
     func deleteNotes(at offsets: IndexSet) {
         notes.remove(atOffsets: offsets)
+        try? modelContext?.save()
     }
 
     /// The routes on `day`, sorted by `order`.
@@ -131,6 +122,7 @@ internal import System
         } else {
             routes.append(route)
         }
+        try? modelContext?.save()
     }
     
     /// Deletes `doomedRoutes`, along with their waypoints and legs.
@@ -139,6 +131,7 @@ internal import System
         for route in doomedRoutes {
             modelContext?.delete(route)
         }
+        try? modelContext?.save()
     }
 
     // MARK: - Search
@@ -146,7 +139,7 @@ internal import System
     /// Finds the adventures that match `query`.
     ///
     /// Matching ignores case and diacritics. Results are ranked by where the match was found:
-    /// name, then tags, then region. Adventures with the same rank are sorted by name.
+    /// name, then brief, then intro. Adventures with the same rank are sorted by name.
     /// - Returns: The matching adventures, or all of `adventures` if `query` is blank.
     static func search(query: String, in adventures: [Adventure]) -> [Adventure] {
           let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -165,12 +158,12 @@ internal import System
               .map(\.adventure)
       }
 
-    /// - Returns: `0` for a name match, `1` for a tag match, `2` for a region match,
+    /// - Returns: `0` for a name match, `1` for a brief match, `2` for an intro match,
     ///   or `nil` if nothing matches. Lower is better.
     private func searchRank(for query: String) -> Int? {
         if name.localizedStandardContains(query) { return 0 }
-        if tags.contains(where: { $0.localizedStandardContains(query)} ) { return 1 }
-        if region.localizedStandardContains(query) { return 2 }
+        if brief?.localizedStandardContains(query) == true { return 1 }
+        if intro.localizedStandardContains(query) { return 2 }
         return nil
     }
 }

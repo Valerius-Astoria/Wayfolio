@@ -1,5 +1,5 @@
 //
-//  EitableText.swift
+//  Binding+OrEmpty.swift
 //  Wayfolio
 //
 //  Created by ZAKA on 11/25/26.

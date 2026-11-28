@@ -17,12 +17,12 @@ struct LocationTracker {
     ///   - maxAccuracy: Fixes with a worse horizontal accuracy (in meters) are dropped.
     ///   - minimumDistance: A fix closer than this (in meters) to the last delivered one is dropped. Use `0` to deliver everything.
     ///   - inBackground: Keeps updates flowing while the app is backgrounded
-    ///     (needs the "Location updates" background mode).
+    ///     (needs the "Location updates" background mode). Defaults to `false`.
     /// - Returns: A stream of locations. It finishes with `LocationError.permissionDenied` if the user denies access.
     static func updates(
         maxAccuracy: CLLocationAccuracy = 50,
         minimumDistance: CLLocationDistance = 5,
-        inBackground: Bool = true
+        inBackground: Bool = false
     ) -> AsyncThrowingStream<CLLocation, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {

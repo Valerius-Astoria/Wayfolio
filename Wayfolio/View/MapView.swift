@@ -1,5 +1,5 @@
 //
-//  MaoView.swift
+//  MapView.swift
 //  Wayfolio
 //
 //  Created by ZAKA on 11/27/26.
@@ -11,7 +11,7 @@ import SwiftData
 
 struct MapView: View {
     @State private var isSheetPresented = true
-    @State private var detent: PresentationDetent = .medium
+    @State private var selection: MapSelection<MapMarkerID>?
     
     @Bindable var mapModel: MapModel
 
@@ -19,7 +19,7 @@ struct MapView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            Map(position: $mapModel.cameraPosition, selection: $mapModel.selectedWaypoint) {
+            Map(position: $mapModel.cameraPosition, selection: $selection) {
                 // Display user location.
                 UserAnnotation()
                 // Display waypoints on the current routes, numbered by visit order.
@@ -30,7 +30,11 @@ struct MapView: View {
                         coordinate: waypoint.coordinate
                     )
                     .tint(mapModel.color(for: waypoint.route))
-                    .tag(waypoint)
+                    .tag(MapSelection(MapMarkerID.waypoint(waypoint.persistentModelID)))
+                }
+                if let place = mapModel.highlightedPlace {
+                    Marker(place.name ?? "Place", coordinate: place.location.coordinate)
+                        .tag(MapSelection(MapMarkerID.highlightedPlace))
                 }
                 // Display routes.
                 ForEach(mapModel.drawnRoutes) { drawn in
@@ -51,24 +55,41 @@ struct MapView: View {
             }
             // Shifts the camera's center point, legal label, and controls up into the visible area
             .safeAreaPadding(.bottom, bottomPadding(for: proxy.size.height))
-            .animation(.easeInOut(duration: 0.25), value: detent)
+            .animation(.easeInOut(duration: 0.25), value: mapModel.sheetDetent)
             .mapControls {
                 MapUserLocationButton()
+            }
+            .mapFeatureSelectionDisabled { feature in
+                feature.kind != .pointOfInterest   // ignore city labels, terrain, etc.
             }
             .onAppear {
                 locationManager.requestWhenInUseAuthorization()
             }
-            .onChange(of: mapModel.selectedWaypoint) { _, waypoint in
-                guard let waypoint else { return }
-                mapModel.focusCamera(on: waypoint)
-                mapModel.revealInSheet(waypoint)
+            .onMapCameraChange(frequency: .onEnd) { context in
+                mapModel.visibleRegion = context.region
+            }
+            .onChange(of: selection) { _, newSelection in
+                if case .waypoint(let id) = newSelection?.value,
+                   let waypoint = mapModel.visibleWaypoints.first(where: { $0.persistentModelID == id }) {
+                    mapModel.focusCamera(on: waypoint)
+                    mapModel.revealInSheet(waypoint)
+                }
+            }
+            .onChange(of: mapModel.highlightedPlace) { _, place in
+                selection = place == nil ? nil : MapSelection(.highlightedPlace)
+            }
+            .task(id: selection?.feature) {
+                guard let feature = selection?.feature else { return }
+                let item = try? await MKMapItemRequest(feature: feature).mapItem
+                guard let item else { return }
+                mapModel.revealInSheet(item)
             }
             .onChange(of: mapModel.navigationPath.count) { oldCount, newCount in
                 mapModel.handleNavigationPop(from: oldCount, to: newCount)
             }
             .sheet(isPresented: $isSheetPresented) {
                 SearchSheet()
-                    .presentationDetents([.fraction(0.15), .medium, .large], selection: $detent)
+                    .presentationDetents([.fraction(0.15), .medium, .large], selection: $mapModel.sheetDetent)
                     .presentationBackgroundInteraction(.enabled(upThrough: .medium))
                     .interactiveDismissDisabled()
                     .environment(mapModel)
@@ -78,7 +99,7 @@ struct MapView: View {
 
     /// Matches the sheet's visible height so the camera stays centered in the uncovered portion.
     private func bottomPadding(for totalHeight: CGFloat) -> CGFloat {
-        switch detent {
+        switch mapModel.sheetDetent {
         case .fraction(0.15):
             return totalHeight * 0.15
         case .medium:
@@ -90,6 +111,12 @@ struct MapView: View {
     }
 }
 
+
+/// Tags for map markers: a route waypoint, or the place highlighted from search.
+private enum MapMarkerID: Hashable {
+    case waypoint(PersistentIdentifier)
+    case highlightedPlace
+}
 
 #Preview {
     MapView(mapModel: MapModel())

@@ -10,6 +10,7 @@ import SwiftUI
 struct WaypointDetail: View {
     @State private var editMode: EditMode = .inactive
     @State private var isEditingHours = false
+    @State private var draftHours = Hours()
     @FocusState private var isTextFieldFocused: Bool
     
     @Bindable var waypoint: Waypoint
@@ -79,7 +80,7 @@ struct WaypointDetail: View {
             }
             if isEditing || !waypoint.clues.isEmpty {
                 Section("Clues") {
-                    ForEach(waypoint.orderedClues, id: \.self) { clue in
+                    ForEach(waypoint.orderedClues, id: \.persistentModelID) { clue in
                         if isEditing {
                             clueEditor(clue)
                         } else {
@@ -107,9 +108,7 @@ struct WaypointDetail: View {
             Section("Hours") {
                 if isEditing, waypoint.hours != nil {
                     // A button, not a `NavigationLink`: a list in edit mode ignores taps on links.
-                    Button("Edit Hours") {
-                        isEditingHours = true
-                    }
+                    Button("Edit Hours", action: openHoursEditor)
                     Button("Remove Hours", role: .destructive) {
                         waypoint.hours = nil
                     }
@@ -125,9 +124,7 @@ struct WaypointDetail: View {
                         }
                     }
                 } else {
-                    Button("Add Hours") {
-                        waypoint.hours = Hours(open: .init(9), close: .init(17))
-                    }
+                    Button("Add Hours", action: openHoursEditor)
                 }
             }
             Section("Details") {
@@ -174,9 +171,12 @@ struct WaypointDetail: View {
         .listStyle(.plain)
         // Outside the list, because SwiftUI ignores a destination placed in a lazy container's row.
         .navigationDestination(isPresented: $isEditingHours) {
-            if let hours = Binding($waypoint.hours) {
-                HoursEditor(hours: hours)
-                    .environment(\.editMode, .constant(.inactive))
+            HoursEditor(hours: $draftHours)
+                .environment(\.editMode, .constant(.inactive))
+        }
+        .onChange(of: isEditingHours) { wasEditing, isEditingNow in
+            if wasEditing, !isEditingNow {
+                commitHoursEditor()
             }
         }
         .navigationTitle(waypoint.name)
@@ -185,6 +185,17 @@ struct WaypointDetail: View {
             EditButton()
         }
         .environment(\.editMode, $editMode)
+    }
+
+    /// Opens the hours editor on a copy so nothing is saved until the user leaves the page.
+    private func openHoursEditor() {
+        draftHours = waypoint.hours ?? Hours()
+        isEditingHours = true
+    }
+
+    /// Writes the draft if the user picked any days; otherwise leaves hours unset.
+    private func commitHoursEditor() {
+        waypoint.hours = draftHours.periods.isEmpty ? nil : draftHours
     }
 
     private func clueEditor(_ clue: Clue) -> some View {

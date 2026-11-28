@@ -17,6 +17,9 @@ import SwiftData
     var endPoint: Waypoint
     var transportType: TransportType
     
+    // MARK: Custom map items
+    // Record-a-path UI is forthcoming. Stored coordinates are drawn on the map when present.
+
     var customCoordinates: [RouteCoordinate] = []
     var expectedTravelTime: Double?
     var distance: Double?
@@ -36,7 +39,7 @@ import SwiftData
         self.route = route
     }
 
-    var useCustomRoute: Bool { !customCoordinates .isEmpty }
+    var useCustomRoute: Bool { !customCoordinates.isEmpty }
 
     /// The recorded path as coordinates, ready for drawing a `MapPolyline`.
     var customPolylineCoordinates: [CLLocationCoordinate2D] {
@@ -58,11 +61,12 @@ import SwiftData
         return route
     }
 
-    /// Records the user's path as the route for this leg, including while the app is in the background.
+    /// Records the user's path as the route for this leg.
     ///
     /// Clears any previous recording. Runs until the surrounding `Task` is cancelled.
     /// `distance` is updated as the user moves, and `expectedTravelTime` is set to
     /// the total duration when recording stops.
+    /// Background recording can be enabled later when the record-a-path UI exists.
     /// - Throws: `LocationError.permissionDenied` if the user denies location access.
     @MainActor
     func buildCustomRoute() async throws {

@@ -22,6 +22,18 @@ struct Schedule: Codable {
         self.endMinute = endMinute
     }
 
+    /// Starts `delay` minutes after `schedule` ends, and lasts `duration` minutes.
+    ///
+    /// With no previous visit, the start is 9:00. Times stay on the same day (they do not wrap past 23:59).
+    init(following schedule: Schedule?, delay: Int = 15, duration: Int = 30) {
+        let startTotal = min((schedule?.endMinutes ?? 9 * 60 - delay) + delay, 23 * 60 + 59)
+        let endTotal = min(startTotal + duration, 23 * 60 + 59)
+        self.startHour = startTotal / 60
+        self.startMinute = startTotal % 60
+        self.endHour = endTotal / 60
+        self.endMinute = endTotal % 60
+    }
+
     /// The start time, in minutes since midnight.
     var startMinutes: Int {
         startHour * 60 + startMinute

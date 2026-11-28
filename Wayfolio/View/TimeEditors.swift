@@ -49,120 +49,69 @@ struct ScheduleEditor: View {
     }
 }
 
-/// A page for editing a place's weekly opening hours, modeled on the editor in Apple Maps.
+/// A page for editing a place's weekly opening hours: the days it is open and one opening period.
 ///
-/// Each card is one set of hours: the days it applies to and when it opens and closes.
-/// A day can appear in several cards, such as for a lunch and a dinner service.
-/// Days that aren't in any card are closed.
+/// Days that aren't selected are closed.
 struct HoursEditor: View {
     @Binding var hours: Hours
 
-    /// The cards being edited. Written back to `hours` as periods whenever they change.
-    @State private var blocks: [HoursBlock]
+    @State private var days: Set<Hours.WeekDay>
+    @State private var open: Hours.Time
+    @State private var close: Hours.Time
+    @State private var isAllDay: Bool
 
     init(hours: Binding<Hours>) {
         _hours = hours
-        _blocks = State(initialValue: HoursBlock.blocks(from: hours.wrappedValue))
+        let periods = hours.wrappedValue.periods
+        _days = State(initialValue: Set(periods.map(\.day)))
+        _open = State(initialValue: periods.first?.open ?? Hours.Time(9))
+        _close = State(initialValue: periods.first?.close ?? Hours.Time(17))
+        _isAllDay = State(initialValue: periods.first?.isAllDay ?? false)
     }
 
     var body: some View {
         Form {
-            ForEach($blocks) { $block in
-                Section {
-                    DaySelector(days: $block.days)
-                        .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
-                    Toggle("Open 24 hours", isOn: $block.isAllDay)
-                    if !block.isAllDay {
-                        HStack {
-                            Text("Hours")
-                            Spacer()
-                            DatePicker("Opens",
-                                       selection: Binding(hour: $block.open.hour, minute: $block.open.minute),
-                                       displayedComponents: .hourAndMinute)
-                                .labelsHidden()
-                            Text("—")
-                            DatePicker("Closes",
-                                       selection: Binding(hour: $block.close.hour, minute: $block.close.minute),
-                                       displayedComponents: .hourAndMinute)
-                                .labelsHidden()
-                        }
-                    }
-                } header: {
+            Section {
+                DaySelector(days: $days)
+                    .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+                Toggle("Open 24 hours", isOn: $isAllDay)
+                if !isAllDay {
                     HStack {
                         Text("Hours")
                         Spacer()
-                        Button("Remove", role: .destructive) {
-                            blocks.removeAll { $0.id == block.id }
-                        }
-                        .font(.footnote)
-                        .textCase(nil)
+                        DatePicker("Opens",
+                                   selection: Binding(hour: $open.hour, minute: $open.minute),
+                                   displayedComponents: .hourAndMinute)
+                            .labelsHidden()
+                        Text("—")
+                        DatePicker("Closes",
+                                   selection: Binding(hour: $close.hour, minute: $close.minute),
+                                   displayedComponents: .hourAndMinute)
+                            .labelsHidden()
                     }
-                } footer: {
-                    if block.isOvernight {
-                        Text("Closes the next day.")
-                    }
-                }
-            }
-            Section {
-                Button("Add Hours") {
-                    blocks.append(HoursBlock(days: unusedDays, open: Hours.Time(9), close: Hours.Time(17)))
                 }
             } footer: {
-                Text("Days that aren't selected are closed.")
+                if !isAllDay, close < open {
+                    Text("Closes the next day.")
+                } else {
+                    Text("Days that aren't selected are closed.")
+                }
             }
         }
         .navigationTitle("Hours")
         .navigationBarTitleDisplayMode(.inline)
-        .onChange(of: blocks) {
-            hours.periods = blocks.flatMap(\.periods)
-        }
+        .onChange(of: days, writeHours)
+        .onChange(of: open, writeHours)
+        .onChange(of: close, writeHours)
+        .onChange(of: isAllDay, writeHours)
     }
 
-    /// The days not selected in any card, which a new card starts with.
-    private var unusedDays: Set<Hours.WeekDay> {
-        Set(Hours.WeekDay.allCases).subtracting(blocks.flatMap(\.days))
-    }
-}
-
-/// One card in `HoursEditor`: a set of days that share the same opening and closing time.
-private struct HoursBlock: Identifiable, Equatable {
-    let id = UUID()
-    var days: Set<Hours.WeekDay>
-    var open: Hours.Time
-    var close: Hours.Time
-
-    /// Open 24 hours, stored as a period that opens and closes at midnight. See `Hours.Period.isAllDay`.
-    var isAllDay: Bool {
-        get { open == close }
-        set {
-            open = Hours.Time(newValue ? 0 : 9)
-            close = Hours.Time(newValue ? 0 : 17)
-        }
-    }
-
-    /// Whether the hours end on the next day. See `Hours.Period.isOvernight`.
-    var isOvernight: Bool { close < open }
-
-    /// One period for each selected day.
-    var periods: [Hours.Period] {
-        Hours.WeekDay.calendarOrder
-            .filter(days.contains)
-            .map { Hours.Period(day: $0, open: open, close: close) }
-    }
-
-    /// Groups the periods in `hours` into cards, one for each distinct opening and closing time.
-    static func blocks(from hours: Hours) -> [HoursBlock] {
-        var blocks: [HoursBlock] = []
-        for day in Hours.WeekDay.calendarOrder {
-            for period in hours.periods(on: day) {
-                if let index = blocks.firstIndex(where: { $0.open == period.open && $0.close == period.close }) {
-                    blocks[index].days.insert(day)
-                } else {
-                    blocks.append(HoursBlock(days: [day], open: period.open, close: period.close))
-                }
-            }
-        }
-        return blocks
+    /// Writes one opening period for each selected day.
+    private func writeHours() {
+        let orderedDays = Hours.WeekDay.calendarOrder.filter(days.contains)
+        let openTime = isAllDay ? Hours.Time(0) : open
+        let closeTime = isAllDay ? Hours.Time(0) : close
+        hours = Hours(orderedDays, open: openTime, close: closeTime)
     }
 }
 
@@ -216,8 +165,6 @@ private extension Hours.WeekDay {
 
 #Preview("Hours") {
     @Previewable @State var hours = Hours([Hours.WeekDay].weekdays, open: .init(9), close: .init(17))
-        .adding([.Fri, .Sat], open: .init(19), close: .init(2))
-        .adding([.Sun], open: .init(0), close: .init(0))
     NavigationStack {
         HoursEditor(hours: $hours)
     }

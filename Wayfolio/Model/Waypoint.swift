@@ -62,6 +62,9 @@ import SwiftData
         self.route = route
     }
 
+    // MARK: Custom map items
+    // Drop-a-pin UI is forthcoming. Sample data and directions already use this initializer.
+
     /// Initializer for a custom waypoint.
     init(name: String,
          icon: String = "mappin",
@@ -121,6 +124,7 @@ import SwiftData
         } else {
             clues.append(clue)
         }
+        try? modelContext?.save()
     }
 
     func deleteClues(at offsets: IndexSet) {
@@ -129,6 +133,7 @@ import SwiftData
         for clue in doomed {
             modelContext?.delete(clue)
         }
+        try? modelContext?.save()
     }
 
     // MARK: - GET MKMapItem
@@ -147,7 +152,9 @@ import SwiftData
         return try? await request.mapItem
     }
 
-    /// - Returns: A map item built from the stored coordinates and details.
+    /// A map item built from the stored coordinates and details.
+    ///
+    /// Used for directions when this stop is a custom place rather than an Apple Maps POI.
     private func getCustomMKMapItem() -> MKMapItem {
         let location = CLLocation(latitude: self.latitude, longitude: self.longitude)
         let address = self.fullAddress.flatMap { full in
