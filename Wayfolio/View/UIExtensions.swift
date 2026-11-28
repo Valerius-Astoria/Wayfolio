@@ -7,6 +7,12 @@
 
 import SwiftUI
 
+/// An SF Symbol offered in `IconMenu`.
+protocol IconPickable: Identifiable, Hashable {
+    var iconName: String { get }
+    var title: String { get }
+}
+
 extension Image {
     func thumbnailStyle(width: CGFloat = 54, height: CGFloat = 72, cornerRadius: CGFloat = 8) -> some View {
         self

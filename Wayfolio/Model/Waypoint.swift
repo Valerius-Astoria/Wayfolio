@@ -103,8 +103,29 @@ import SwiftData
     /// - Returns: `nil` if the opening hours are unknown. See `Hours.isOpen(at:)`.
     var isOpening: Bool? { hours?.isOpen() }
     
+    /// The clues, sorted by `order`.
+    var orderedClues: [Clue] {
+        clues.sorted { $0.order < $1.order }
+    }
+
+    /// Adds an empty clue at the end of the list.
+    func addClue() {
+        let clue = Clue(
+            clueName: "New Clue",
+            detail: "",
+            waypoint: self,
+            order: (clues.map(\.order).max() ?? -1) + 1
+        )
+        if clues.contains(where: { $0 === clue }) {
+            clues = Array(clues)
+        } else {
+            clues.append(clue)
+        }
+    }
+
     func deleteClues(at offsets: IndexSet) {
-        let doomed = offsets.map { clues[$0] }
+        let doomed = offsets.map { orderedClues[$0] }
+        clues.removeAll { doomed.contains($0) }
         for clue in doomed {
             modelContext?.delete(clue)
         }

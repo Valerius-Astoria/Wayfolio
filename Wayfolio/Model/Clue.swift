@@ -8,9 +8,8 @@
 import SwiftUI
 import SwiftData
 
-/// A clue hidden at a waypoint, which the user unlocks by meeting all of its conditions.
-///
-/// A clue with no conditions is unlocked as soon as the user opens it.
+/// A clue hidden at a waypoint. Conditions can be solved independently; the clue is only
+/// marked done when the user taps Check.
 @Model class Clue {
     var name: String
     var brief: String?
@@ -28,8 +27,8 @@ import SwiftData
     init(clueName: String,
          brief: String? = nil,
          detail: String,
-         icon: String = "folder",
-         ismanualChecked: Bool = false, // no condition
+         icon: String = Symbol.others.rawValue,
+         ismanualChecked: Bool = false,
          location: LocationCondition? = nil,
          photo: PhotoCondition? = nil,
          question: QuestionCondition? = nil,
@@ -47,6 +46,36 @@ import SwiftData
         self.order = order
     }
 
+    /// The symbols offered when picking a clue's icon, with the name shown in the menu.
+    enum Symbol: String, CaseIterable, Identifiable, IconPickable {
+        case letter = "envelope"
+        case scroll = "scroll"
+        case idea = "lightbulb"
+        case key = "key.fill"
+        case look = "binoculars"
+        case star = "star"
+        case riddle = "questionmark.circle"
+        case photo = "camera"
+        case others = "folder"
+
+        var id: String { rawValue }
+        var iconName: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .letter: "Letter"
+            case .scroll: "Scroll"
+            case .idea: "Idea"
+            case .key: "Key"
+            case .look: "Look"
+            case .star: "Star"
+            case .riddle: "Riddle"
+            case .photo: "Photo"
+            case .others: "Others"
+            }
+        }
+    }
+
     /// One label for each condition the clue has, in the order they're checked.
     var icons: [IconLabel] {
         [
@@ -57,11 +86,39 @@ import SwiftData
         .compactMap { $0 }
     }
     
-    var isChecked: Bool {
+    /// Whether the user has marked this clue as done. Meeting its conditions is not enough.
+    var isChecked: Bool { ismanualChecked }
+
+    /// Whether every attached condition is currently satisfied. True when there are no conditions.
+    var areConditionsMet: Bool {
         let conditions: [Checkable] = ([location, photo, question] as [Checkable?]).compactMap { $0 }
-        // With no conditions, `allSatisfy` would always be true, so only the user's own check counts.
-        guard !conditions.isEmpty else { return ismanualChecked }
-        return conditions.allSatisfy { $0.isChecked } || ismanualChecked
+        return conditions.allSatisfy(\.isChecked)
+    }
+
+    // MARK: - Editing
+
+    func addQuestion() {
+        guard question == nil else { return }
+        question = QuestionCondition(question: "", answer: "", hint: "")
+    }
+
+    func addLocation() {
+        guard location == nil else { return }
+        location = LocationCondition(
+            latitude: waypoint.latitude,
+            longitude: waypoint.longitude,
+            radius: 50
+        )
+    }
+
+    func addPhoto(from image: UIImage, name: String = "Photo") {
+        guard photo == nil, let condition = PhotoCondition(name: name, reference: image) else { return }
+        photo = condition
+    }
+
+    func replacePhoto(from image: UIImage, name: String? = nil) {
+        guard let condition = PhotoCondition(name: name ?? photo?.name ?? "Photo", reference: image) else { return }
+        photo = condition
     }
 }
 

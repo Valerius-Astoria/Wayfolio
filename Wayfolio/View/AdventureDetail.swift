@@ -340,17 +340,17 @@ struct AddRow: View {
     }
 }
 
-/// A menu for picking a note icon, labeled with the current symbol.
-struct IconMenu: View {
+/// A menu for picking an icon, labeled with the current symbol.
+struct IconMenu<Choice: IconPickable>: View {
     @Binding var selection: String
-    let choices: [Note.Symbol]
+    let choices: [Choice]
 
     var body: some View {
         Menu {
             Picker("Icon", selection: $selection) {
                 ForEach(choices) { choice in
-                    Label(choice.title, systemImage: choice.rawValue)
-                        .tag(choice.rawValue)
+                    Label(choice.title, systemImage: choice.iconName)
+                        .tag(choice.iconName)
                 }
             }
             .pickerStyle(.inline)
@@ -358,7 +358,7 @@ struct IconMenu: View {
             Image(systemName: selection)
         }
         .accessibilityLabel("Icon")
-        .accessibilityValue(Note.Symbol(rawValue: selection)?.title ?? selection)
+        .accessibilityValue(choices.first { $0.iconName == selection }?.title ?? selection)
     }
 }
 //

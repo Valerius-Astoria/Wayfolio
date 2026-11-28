@@ -10,46 +10,59 @@ import SwiftUI
 struct WaypointDetail: View {
     @State private var editMode: EditMode = .inactive
     @State private var isEditingHours = false
+    @FocusState private var isTextFieldFocused: Bool
     
     @Bindable var waypoint: Waypoint
     private var isEditing: Bool { editMode.isEditing }
     
     var body: some View {
-        HStack {
-            VStack {
-                Text("Schedule").font(.title3)
-                Text(waypoint.schedule.display()).font(.subheadline)
-            }
-            .padding(.horizontal)
-            
-            Divider().frame(height: 36)
-            
-            VStack {
-                Text("IsOpen").font(.title3)
-                if let isOpening = waypoint.isOpening {
-                    Text(isOpening ? "Open" : "Closed")
-                        .foregroundStyle(isOpening ? Color.green : .red)
-                        .font(.subheadline)
-                } else {
-                    Text("Unknown")
-                        .foregroundStyle(Color.gray)
+        if !isEditing {
+            HStack {
+                VStack {
+                    Text("Schedule").font(.title3)
+                    Text(waypoint.schedule.display()).font(.subheadline)
+                }
+                .padding(.horizontal)
+                
+                Divider().frame(height: 36)
+                
+                VStack {
+                    Text("IsOpen").font(.title3)
+                    if let isOpening = waypoint.isOpening {
+                        Text(isOpening ? "Open" : "Closed")
+                            .foregroundStyle(isOpening ? Color.green : .red)
+                            .font(.subheadline)
+                    } else {
+                        Text("Unknown")
+                            .foregroundStyle(Color.gray)
+                            .font(.subheadline)
+                    }
+                }
+                .padding(.horizontal)
+                
+                Divider().frame(height: 36)
+                
+                VStack {
+                    Text("Status").font(.title3)
+                    Text(waypoint.isChecked ? "Checked" : "Unchecked")
+                        .foregroundStyle(waypoint.isChecked ? Color.green : .gray)
                         .font(.subheadline)
                 }
+                .padding(.horizontal)
             }
-            .padding(.horizontal)
-            
-            Divider().frame(height: 36)
-            
-            VStack {
-                Text("Status").font(.title3)
-                Text(waypoint.isChecked ? "Checked" : "Unchecked")
-                    .foregroundStyle(waypoint.isChecked ? Color.green : .gray)
-                    .font(.subheadline)
-            }
-            .padding(.horizontal)
+            .padding(.top, 8)
         }
-        .padding(.top, 8)
+        
         List {
+            if isEditing {
+                HStack {
+                    Text("Title").padding(.trailing, 5)
+                    TextField(waypoint.name, text: $waypoint.name)
+                        .foregroundStyle(.secondary)
+                        .focused($isTextFieldFocused)
+                }
+            }
+            
             if isEditing {
                 Section("Schedule") {
                     ScheduleEditor(schedule: $waypoint.schedule)
@@ -64,40 +77,31 @@ struct WaypointDetail: View {
                     }
                 }
             }
-            if !waypoint.clues.isEmpty {
+            if isEditing || !waypoint.clues.isEmpty {
                 Section("Clues") {
-                    ForEach(waypoint.clues, id: \.self) { clue in
-                        NavigationLink {
-                            ClueDetail(clue: clue)
-                        } label: {
-                            Label {
-                                VStack(alignment: .leading) {
-                                    HStack {
-                                        if clue.isChecked {
-                                            Circle()
-                                                .fill(.green)
-                                                .frame(width: 9, height: 9)
-                                        }
-                                        Text(clue.name)
-                                        ForEach(clue.icons, id: \.self) { label in
-                                            Image(systemName: label.icon)
-                                                .foregroundStyle(label.color)
-                                                .font(.footnote)
-                                        }
-                                    }
-                                    
-                                    if let brief = clue.brief {
-                                        Text(brief)
-                                            .font(.footnote)
-                                            .foregroundStyle(.gray)
-                                    }
-                                }
-                            } icon: {
-                                Image(systemName: clue.icon)
+                    ForEach(waypoint.orderedClues, id: \.self) { clue in
+                        if isEditing {
+                            clueEditor(clue)
+                        } else {
+                            NavigationLink {
+                                ClueDetail(clue: clue)
+                            } label: {
+                                clueRow(clue)
                             }
                         }
                     }
-                    .onDelete(perform: waypoint.deleteClues(at: ))
+                    .onDelete(perform: waypoint.deleteClues(at:))
+                    if isEditing {
+                        Button {
+                            withAnimation {
+                                waypoint.addClue()
+                            }
+                        } label: {
+                            AddRow("Add a clue")
+                        }
+                        .deleteDisabled(true)
+                        .moveDisabled(true)
+                    }
                 }
             }
             Section("Hours") {
@@ -181,6 +185,46 @@ struct WaypointDetail: View {
             EditButton()
         }
         .environment(\.editMode, $editMode)
+    }
+
+    private func clueEditor(_ clue: Clue) -> some View {
+        @Bindable var clue = clue
+        return HStack {
+            IconMenu(selection: $clue.icon, choices: Clue.Symbol.allCases)
+                .padding(.trailing, 5)
+                .foregroundStyle(.blue)
+            TextField("Name", text: $clue.name)
+                .focused($isTextFieldFocused)
+        }
+        .listRowBackground(Color.clear)
+    }
+
+    private func clueRow(_ clue: Clue) -> some View {
+        Label {
+            VStack(alignment: .leading) {
+                HStack {
+                    if clue.isChecked {
+                        Circle()
+                            .fill(.green)
+                            .frame(width: 9, height: 9)
+                    }
+                    Text(clue.name)
+                    ForEach(clue.icons, id: \.self) { label in
+                        Image(systemName: label.icon)
+                            .foregroundStyle(label.color)
+                            .font(.footnote)
+                    }
+                }
+
+                if let brief = clue.brief {
+                    Text(brief)
+                        .font(.footnote)
+                        .foregroundStyle(.gray)
+                }
+            }
+        } icon: {
+            Image(systemName: clue.icon)
+        }
     }
 }
 

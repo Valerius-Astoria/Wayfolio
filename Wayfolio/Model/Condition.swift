@@ -23,10 +23,13 @@ struct LocationCondition: Checkable, Codable, Hashable {
 
     static let label = IconLabel(name: "location", icon: "mappin.circle", color: .orange)
 
+    var unmetMessage: String { "Check that you're at the right position." }
+
     /// Gets the user's current location and compares its distance to the target with `radius`.
     ///
     /// - Throws: `ConditionFailure` if the user's location isn't available or the user is too far away.
     mutating func check() async throws {
+        isChecked = false
         let userLocation: CLLocation
         do {
             userLocation = try await LocationTracker.currentLocation()
@@ -56,6 +59,8 @@ struct PhotoCondition: Checkable, Codable, Hashable {
 
     static let label = IconLabel(name: "photo", icon: "photo", color: .orange)
 
+    var unmetMessage: String { "Take a photo first." }
+
     /// - Returns: `nil` if `image` can't be compressed.
     init?(name: String, reference image: UIImage, threshold: Float = 0.5) {
         guard let data = image.jpegData(compressionQuality: 0.8) else { return nil }
@@ -70,6 +75,7 @@ struct PhotoCondition: Checkable, Codable, Hashable {
     ///
     /// - Throws: `ConditionFailure` if the photo isn't similar enough or can't be analyzed.
     mutating func check(photo: UIImage?) throws {
+        isChecked = false
         guard let photo else { throw ConditionFailure("Take a photo first.") }
         guard let referenceCG = referenceImage?.cgImage else {
             throw ConditionFailure("The reference photo is missing or corrupted.")
@@ -114,15 +120,34 @@ struct QuestionCondition: Checkable, Codable, Hashable {
 
     static let label = IconLabel(name: "question", icon: "pencil.circle", color: .orange)
 
+    /// Whether both the prompt and the expected answer have text.
+    var isFilled: Bool {
+        !question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Message to show when the clue is checked but this question isn't solved yet.
+    func unmetMessage(for attempt: String) -> String {
+        attempt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "Enter an answer."
+            : "That answer isn't correct."
+    }
+
     /// Stores `attempt` as `response`, then compares it with `answer`.
     ///
-    /// - Throws: `ConditionFailure` if `attempt` is wrong.
+    /// - Throws: `ConditionFailure` if `attempt` is empty or wrong.
     mutating func check(answer attempt: String?) throws {
         response = attempt
+        isChecked = false
         let attempt = attempt?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard !attempt.isEmpty else { return }
+        guard !attempt.isEmpty else {
+            throw ConditionFailure("Enter an answer.")
+        }
 
         let answer = answer.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !answer.isEmpty else {
+            throw ConditionFailure("This question has no answer yet.")
+        }
         guard attempt.caseInsensitiveCompare(answer) == .orderedSame else {
             throw ConditionFailure("That answer isn't correct.")
         }

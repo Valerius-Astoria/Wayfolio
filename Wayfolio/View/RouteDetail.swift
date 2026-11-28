@@ -13,6 +13,7 @@ struct RouteDetail: View {
     /// Owned here rather than read from the environment, because this view is the one that sets it.
     @State private var editMode: EditMode = .inactive
     @Environment(MapModel.self) var mapModel
+    @FocusState private var isTextFieldFocused: Bool
     
     @Bindable var route: Route
     
@@ -20,6 +21,20 @@ struct RouteDetail: View {
     
     var body: some View {
         List {
+            if isEditing {
+                HStack {
+                    Text("Title").padding(.trailing, 5)
+                    TextField(route.name, text: $route.name)
+                        .foregroundStyle(.secondary)
+                        .focused($isTextFieldFocused)
+                }
+                HStack {
+                    Text("Subtitle").padding(.trailing, 5)
+                    TextField("Intro", text: $route.brief.orEmpty, axis: .vertical)
+                        .foregroundStyle(.secondary)
+                        .focused($isTextFieldFocused)
+                }
+            }
             if isEditing || route.intro != nil {
                 Section("Introduction") {
                     TextField("Intro", text: $route.intro.orEmpty, axis: .vertical)

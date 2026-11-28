@@ -184,7 +184,7 @@ struct Note: Codable, Identifiable {
     var body: String
 
     /// The symbols offered when picking a note's icon, with the name shown in the menu.
-    enum Symbol: String, CaseIterable, Identifiable {
+    enum Symbol: String, CaseIterable, Identifiable, IconPickable {
         case weather = "sun.rain.fill"
         case food = "fork.knife"
         case money = "dollarsign.circle"
@@ -192,6 +192,7 @@ struct Note: Codable, Identifiable {
         case others = "info.circle"
 
         var id: String { rawValue }
+        var iconName: String { rawValue }
 
         var title: String {
             switch self {
