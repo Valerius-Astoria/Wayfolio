@@ -14,19 +14,40 @@ struct SearchSheet: View {
     @Query(sort: \Adventure.name) private var adventures: [Adventure]
     
     @State private var query = ""
+    @Environment(MapModel.self) var mapModel
     
     var body: some View {
-        NavigationStack {
+        @Bindable var mapModel = mapModel
+        
+        NavigationStack(path: $mapModel.navigationPath) {
             List(Adventure.search(query: query, in: adventures)) { adventure in
-                NavigationLink {
-                    AdventureDetail(adventure: adventure)
+                Button {
+                    mapModel.select(adventure)
+                    mapModel.navigationPath.append(adventure)
                 } label: {
-                    AdventureRow(adventure: adventure, font: .caption.bold())
+                    HStack {
+                        AdventureRow(adventure: adventure, font: .caption.bold())
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .contentShape(Rectangle()) // Makes the entire row tappable
                 }
+                .buttonStyle(.plain)
             }
             .navigationTitle("Search")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search adventures")
+            .navigationDestination(for: Adventure.self) { adventure in
+                AdventureDetail(adventure: adventure)
+            }
+            .navigationDestination(for: Route.self) { route in
+                RouteDetail(route: route)
+            }
+            .navigationDestination(for: Waypoint.self) { waypoint in
+                WaypointDetail(waypoint: waypoint)
+            }
         }
     }
 }
@@ -98,8 +119,8 @@ struct AdventureRow: View {
         
     }
 }
-
-#Preview {
-    SearchSheet()
-        .modelContainer(SampleData.shared.modelContainer)
-}
+//
+//#Preview {
+//    SearchSheet()
+//        .modelContainer(SampleData.shared.modelContainer)
+//}

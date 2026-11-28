@@ -6,13 +6,16 @@
 //
 
 import SwiftUI
+import SwiftData
 
 /// A route's detail page: its introduction and a timeline of its waypoints.
 struct RouteDetail: View {
     /// Owned here rather than read from the environment, because this view is the one that sets it.
     @State private var editMode: EditMode = .inactive
+    @Environment(MapModel.self) var mapModel
     
     @Bindable var route: Route
+    
     private var isEditing: Bool { editMode.isEditing }
     
     var body: some View {
@@ -34,13 +37,24 @@ struct RouteDetail: View {
             EditButton()
         }
         .environment(\.editMode, $editMode)
-        .task(id: route.pointLegs) {
-            for pointLeg in route.pointLegs where pointLeg.distance == nil && !pointLeg.useCustomRoute {
+        .onChange(of: waypointGraphID, initial: true) {
+            route.rebuildLegs()
+        }
+        .task(id: waypointGraphID) {
+            route.rebuildLegs()
+            for pointLeg in route.orderedPointlegs where pointLeg.distance == nil && !pointLeg.useCustomRoute {
+                if Task.isCancelled { return }
                 _ = try? await pointLeg.getOfficialDirections()
             }
         }
     }
-    
+
+    /// Waypoint identity, visit order, and coordinates — any change means the legs are stale.
+    private var waypointGraphID: String {
+        route.orderedWaypoints
+            .map { "\($0.persistentModelID):\($0.order):\($0.latitude):\($0.longitude)" }
+            .joined(separator: "|")
+    }
 }
 
 /// A vertical timeline of a route: each waypoint at its start time,
@@ -50,25 +64,42 @@ struct RouteDetail: View {
 struct Timeline: View {
     let route: Route
     
+    @Environment(MapModel.self) var mapModel
+    @Environment(\.editMode) private var editMode
+    
+    private var isEditing: Bool { editMode?.wrappedValue.isEditing ?? false }
+    
     /// The width of the time column. The connecting lines run down its center.
     private let timeColumnWidth: CGFloat = 44
     
     var body: some View {
         ForEach(route.orderedWaypoints, id: \.self) { waypoint in
-            NavigationLink {
-                WaypointDetail(waypoint: waypoint)
-            } label: {
-                waypointRow(waypoint)
-            }
-            .timelineRow()
+            waypointLine(waypoint)
+                .timelineRow()
             
             if let leg = route.leg(from: waypoint) {
                 legRow(leg)
                     .timelineRow()
                     .deleteDisabled(true)
+                    .moveDisabled(true)
             }
         }
         .onDelete(perform: route.deleteWaypoints)
+        .onMove(perform: route.moveWaypoints)
+    }
+    
+    @ViewBuilder
+    private func waypointLine(_ waypoint: Waypoint) -> some View {
+        if isEditing {
+            waypointRow(waypoint)
+        } else {
+            Button {
+                mapModel.select(waypoint)
+            } label: {
+                waypointRow(waypoint)
+            }
+            .buttonStyle(.plain)
+        }
     }
     
     private func waypointRow(_ waypoint: Waypoint) -> some View {
@@ -85,7 +116,11 @@ struct Timeline: View {
                 Text("📜: \(waypoint.clues.count { $0.isChecked }) / \(waypoint.clues.count)")
                     .font(.footnote)
             }
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.tertiary)
         }
+        .contentShape(Rectangle())
         .padding(.vertical, 6)
     }
     
@@ -171,5 +206,5 @@ private extension View {
     NavigationStack {
         RouteDetail(route: Adventure.sampleData.first!.routes.first!)
     }
-    
+    .environment(MapModel())
 }

@@ -92,6 +92,11 @@ import SwiftData
     }
 
     var isPOI: Bool { return poiIdentifier != nil }
+
+    /// The stored latitude and longitude as a map coordinate.
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
     
     /// Whether the place is open right now.
     ///

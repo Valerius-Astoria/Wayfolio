@@ -11,7 +11,6 @@ import SwiftData
 /// An adventure's detail page: a header with the cover, name, and size,
 /// followed by its introduction, routes, and notes.
 struct AdventureDetail: View {
-    @State private var selectedRoute: Route?
     /// Owned here rather than read from the environment, because this view is the one that sets it.
     @State private var editMode: EditMode = .inactive
     /// The day whose routes are listed, or `nil` for all days.
@@ -21,6 +20,7 @@ struct AdventureDetail: View {
     @State private var selectedTypes: [AdventureType] = []
     
     @Bindable var adventure: Adventure
+    @Environment(MapModel.self) var mapModel
     private var isEditing: Bool { editMode.isEditing }
     
     @FocusState private var isTextFieldFocused: Bool
@@ -149,9 +149,6 @@ struct AdventureDetail: View {
             }
             .listStyle(.plain)
             .scrollDismissesKeyboard(.interactively)
-            .navigationDestination(item: $selectedRoute) { route in
-                RouteDetail(route: route)
-            }
             .toolbar {
                 EditButton()
             }
@@ -200,7 +197,8 @@ struct AdventureDetail: View {
                     .routeListRow()
             } else {
                 Button {
-                    selectedRoute = route
+                    mapModel.select(route)
+                    mapModel.navigationPath.append(route)
                 } label: {
                     RouteRow(route: route)
                 }
@@ -363,9 +361,9 @@ struct IconMenu: View {
         .accessibilityValue(Note.Symbol(rawValue: selection)?.title ?? selection)
     }
 }
-
-#Preview {
-    NavigationStack {
-        AdventureDetail(adventure: Adventure.createSampleAdventure())
-    }
-}
+//
+//#Preview {
+//    NavigationStack {
+//        AdventureDetail(adventure: Adventure.createSampleAdventure(), mapModel: <#MapModel#>)
+//    }
+//}

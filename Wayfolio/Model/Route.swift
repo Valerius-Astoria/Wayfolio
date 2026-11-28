@@ -5,6 +5,7 @@
 //  Created by ZAKA on 11/23/26.
 //
 
+import CoreLocation
 import SwiftData
 import Foundation
 
@@ -47,6 +48,11 @@ import Foundation
             .sorted { $0.order < $1.order }
     }
 
+    /// The waypoints' locations, in visit order.
+    var coordinates: [CLLocationCoordinate2D] {
+        orderedWaypoints.map(\.coordinate)
+    }
+
     /// The legs, sorted by `order`.
     var orderedPointlegs: [PointLeg] {
         pointLegs
@@ -84,16 +90,33 @@ import Foundation
     func deleteWaypoints(at offsets: IndexSet) {
         let ordered = orderedWaypoints
         let doomedWaypoints = Set(offsets.map { ordered[$0] })
+        let remaining = ordered.filter { !doomedWaypoints.contains($0) }
 
-        waypoints = ordered.filter { !doomedWaypoints.contains($0) }
-        for (index, waypoint) in waypoints.enumerated() {
+        for (index, waypoint) in remaining.enumerated() {
             waypoint.order = index
         }
+        waypoints = remaining
         // Rebuild before deleting, so no leg still points at a deleted waypoint.
         rebuildLegs()
         for waypoint in doomedWaypoints {
             modelContext?.delete(waypoint)
         }
+    }
+
+    /// Moves waypoints in `orderedWaypoints`, then reconnects the legs. See `rebuildLegs()`.
+    func moveWaypoints(from source: IndexSet, to destination: Int) {
+        var ordered = orderedWaypoints
+        let moved = source.sorted().map { ordered[$0] }
+        for index in source.sorted(by: >) {
+            ordered.remove(at: index)
+        }
+        let insertion = min(destination - source.count(where: { $0 < destination }), ordered.count)
+        ordered.insert(contentsOf: moved, at: insertion)
+        for (index, waypoint) in ordered.enumerated() {
+            waypoint.order = index
+        }
+        waypoints = ordered
+        rebuildLegs()
     }
 
     /// Makes `pointLegs` connect each waypoint to the next one in `orderedWaypoints`.

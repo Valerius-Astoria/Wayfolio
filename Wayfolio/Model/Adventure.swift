@@ -50,6 +50,29 @@ internal import System
         self.tags = tags
         self.image = image
     }
+    
+    /// Every waypoint's location across all routes, for framing the map.
+    var coordinates: [CLLocationCoordinate2D] {
+        routes.flatMap(\.orderedWaypoints).map(\.coordinate)
+    }
+
+    /// Every leg across all routes, in day, route, and visit order.
+    var orderedPointLegs: [PointLeg] {
+        orderedRoutes.flatMap(\.orderedPointlegs)
+    }
+
+    /// Every waypoint across all routes, in day, route, and visit order.
+    var orderedWaypoints: [Waypoint] {
+        orderedRoutes.flatMap(\.orderedWaypoints)
+    }
+
+    /// Routes sorted by day, then by `order` within the day.
+    var orderedRoutes: [Route] {
+        routes.sorted {
+            if $0.day != $1.day { return $0.day < $1.day }
+            return $0.order < $1.order
+        }
+    }
 
     /// The total number of waypoints across all routes.
     var waypointCount: Int {
